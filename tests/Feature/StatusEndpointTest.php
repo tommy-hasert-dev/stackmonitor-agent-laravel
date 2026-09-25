@@ -89,6 +89,12 @@ it('returns a 404 indistinguishable from an unknown route', function (string $me
     'OPTIONS' => ['OPTIONS'],
 ]);
 
+it('ignores an unknown _sm cache-buster query parameter (M4)', function () {
+    $headers = signedHeaders();
+
+    $this->get('/stackmonitor/status?_sm=deadbeefdeadbeefdeadbeefdeadbeef', $headers)->assertOk();
+});
+
 it('rejects replayed nonces', function () {
     $headers = signedHeaders();
 
