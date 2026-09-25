@@ -1,0 +1,39 @@
+{
+    "name": "stackmonitor/agent-laravel",
+    "description": "Read-only StackMonitor agent for Laravel applications",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.1",
+        "illuminate/cache": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/contracts": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/http": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/routing": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/support": "^10.0|^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.32.1",
+        "opis/json-schema": "^2.6",
+        "orchestra/testbench": "^11.3",
+        "pestphp/pest": "^5.2.1"
+    },
+    "autoload": {
+        "psr-4": { "StackMonitor\\Agent\\": "src/" }
+    },
+    "autoload-dev": {
+        "psr-4": { "StackMonitor\\Agent\\Tests\\": "tests/" }
+    },
+    "extra": {
+        "laravel": { "providers": ["StackMonitor\\Agent\\AgentServiceProvider"] }
+    },
+    "scripts": {
+        "lint": "pint",
+        "test": ["pint --test", "pest"]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": { "pestphp/pest-plugin": true }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
