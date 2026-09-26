@@ -3,25 +3,13 @@
 Nur lesender Agent. Er liefert dem StackMonitor-Dashboard Laravel-, PHP- und Paketversionen.
 Unterstützt Laravel 10–13 und PHP ≥ 8.1.
 
-## Installation (bis zur Veröffentlichung als Paket)
+## Installation
 
-1. Den Ordner `agents/laravel` in das Kundenprojekt kopieren, z. B. nach `packages/stackmonitor-agent-laravel`.
-   Dabei `vendor/`, `tests/`, `composer.lock` sowie die Entwicklungs-Dateien `phpunit.xml`, `pint.json`,
-   `.gitattributes` und `.gitignore` auslassen — sie werden im Kundenprojekt nicht gebraucht. Entweder gezielt
-   mit `rsync -a --exclude=vendor --exclude=tests --exclude=composer.lock agents/laravel/ packages/stackmonitor-agent-laravel/`
-   kopieren, oder — sofern das Paket als eigenes Git-Repository vorliegt und `.gitattributes` die
-   `export-ignore`-Einträge dieses Verzeichnisses enthält — mit `git archive` einen sauberen Snapshot exportieren.
-2. In der `composer.json` des Kundenprojekts:
-   ```json
-   "repositories": [
-       { "type": "path", "url": "packages/stackmonitor-agent-laravel", "options": { "symlink": false } }
-   ]
-   ```
-3. `composer require stackmonitor/agent-laravel:@dev`
-4. Im StackMonitor-Dashboard die Site öffnen, dann **Bearbeiten → Agent → Secret erzeugen**.
-5. Die angezeigte Zeile in die `.env` der Site eintragen:
+1. `composer require stackmonitor/agent-laravel`
+2. Im StackMonitor-Dashboard die Site öffnen, dann **Bearbeiten → Agent → Secret erzeugen**.
+3. Die angezeigte Zeile in die `.env` der Site eintragen:
    `STACKMONITOR_AGENT_SECRET=…`
-6. `php artisan config:cache` ausführen, falls die Config gecacht wird. Wird die `.env` später erneut geändert
+4. `php artisan config:cache` ausführen, falls die Config gecacht wird. Wird die `.env` später erneut geändert
    (z. B. neues Secret, anderer Pfad), müssen `php artisan config:cache` und, falls Routen gecacht sind,
    `php artisan route:cache` erneut ausgeführt werden — sonst greift weiterhin die alte, gecachte Konfiguration.
 
@@ -46,3 +34,7 @@ Läuft wie alles lokal im `tools`-Container (siehe README im Wurzelverzeichnis),
 docker compose run --rm -w /app/agents/laravel tools composer install
 docker compose run --rm -w /app/agents/laravel tools composer test   # Pint und Pest
 ```
+
+## Lizenz
+
+MIT, siehe `LICENSE`.

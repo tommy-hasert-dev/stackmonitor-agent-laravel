@@ -2,7 +2,8 @@
     "name": "stackmonitor/agent-laravel",
     "description": "Read-only StackMonitor agent for Laravel applications",
     "type": "library",
-    "license": "proprietary",
+    "license": "MIT",
+    "keywords": ["laravel", "monitoring", "stackmonitor"],
     "require": {
         "php": "^8.1",
         "illuminate/cache": "^10.0|^11.0|^12.0|^13.0",
