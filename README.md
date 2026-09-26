@@ -37,3 +37,12 @@ Der Endpunkt ist `GET /stackmonitor/status`. Der Pfad lässt sich mit `STACKMONI
   die Treiber `array` und `null` schützen nicht vor Replays: `array` vergisst genutzte Nonces beim nächsten
   Request-Prozess, `null` speichert gar nichts, und bei mehreren Knoten ohne geteilten Cache sieht jeder Knoten
   nur seine eigenen bereits genutzten Nonces.
+
+## Entwicklung
+
+Läuft wie alles lokal im `tools`-Container (siehe README im Wurzelverzeichnis), aus dem Wurzelverzeichnis:
+
+```bash
+docker compose run --rm -w /app/agents/laravel tools composer install
+docker compose run --rm -w /app/agents/laravel tools composer test   # Pint und Pest
+```
