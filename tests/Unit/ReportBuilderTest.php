@@ -9,8 +9,9 @@ it('builds the report from composer files', function () {
         ->and($report['core'])->toBe(['version' => app()->version(), 'update_available' => null])
         ->and($report['php'])->toBe(PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'.'.PHP_RELEASE_VERSION)
         ->and($report['packages'])->toBe([
-            ['type' => 'composer', 'name' => 'laravel/framework', 'version' => 'v13.30.0', 'update_available' => null, 'direct' => true],
-            ['type' => 'composer', 'name' => 'guzzlehttp/guzzle', 'version' => '7.9.0', 'update_available' => null, 'direct' => false],
+            ['type' => 'composer', 'name' => 'laravel/framework', 'version' => 'v13.30.0', 'update_available' => null, 'direct' => true, 'listed' => true],
+            ['type' => 'composer', 'name' => 'guzzlehttp/guzzle', 'version' => '7.9.0', 'update_available' => null, 'direct' => false, 'listed' => true],
+            ['type' => 'composer', 'name' => 'acme/billing', 'version' => '2.1.0', 'update_available' => null, 'direct' => true, 'listed' => false],
         ])
         ->and($report['flags'])->toBe(['debug' => false, 'environment' => app()->environment()]);
 });

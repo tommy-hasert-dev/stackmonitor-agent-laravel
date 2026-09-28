@@ -1,9 +1,10 @@
 {
     "packages": [
-        { "name": "laravel/framework", "version": "v13.30.0" },
-        { "name": "guzzlehttp/guzzle", "version": "7.9.0" }
+        { "name": "laravel/framework", "version": "v13.30.0", "notification-url": "https://packagist.org/downloads/" },
+        { "name": "guzzlehttp/guzzle", "version": "7.9.0", "notification-url": "https://packagist.org/downloads/" },
+        { "name": "acme/billing", "version": "2.1.0", "source": { "type": "git", "url": "git@git.acme.test:acme/billing.git" } }
     ],
     "packages-dev": [
-        { "name": "pestphp/pest", "version": "v5.2.1" }
+        { "name": "pestphp/pest", "version": "v5.2.1", "notification-url": "https://packagist.org/downloads/" }
     ]
 }

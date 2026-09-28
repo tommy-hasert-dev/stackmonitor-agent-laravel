@@ -9,6 +9,9 @@ final class ReportBuilder
 {
     public const AGENT_VERSION = '1.0.0';
 
+    /** What composer.lock records for a package installed from packagist.org. */
+    private const PACKAGIST_NOTIFICATION_URL = 'https://packagist.org/downloads/';
+
     public function __construct(
         private readonly Application $app,
         private readonly ?string $basePath = null,
@@ -34,7 +37,11 @@ final class ReportBuilder
     }
 
     /**
-     * @return list<array{type: string, name: string, version: string, update_available: null, direct: bool}>
+     * `listed` tells whether the package came from packagist.org, so the
+     * dashboard links only public packages there, not private ones from a
+     * VCS, path or Private Packagist repository.
+     *
+     * @return list<array{type: string, name: string, version: string, update_available: null, direct: bool, listed: bool}>
      */
     private function packages(): array
     {
@@ -54,6 +61,7 @@ final class ReportBuilder
                 'version' => (string) $package['version'],
                 'update_available' => null,
                 'direct' => in_array($package['name'], $direct, true),
+                'listed' => ($package['notification-url'] ?? null) === self::PACKAGIST_NOTIFICATION_URL,
             ];
         }
 
