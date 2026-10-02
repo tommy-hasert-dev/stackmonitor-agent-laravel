@@ -7,7 +7,7 @@ use StackMonitor\Agent\ErrorLog\ErrorLog;
 
 final class ReportBuilder
 {
-    public const AGENT_VERSION = '1.5.0';
+    public const AGENT_VERSION = '1.6.0';
 
     /** What composer.lock records for a package installed from packagist.org. */
     private const PACKAGIST_NOTIFICATION_URL = 'https://packagist.org/downloads/';
@@ -34,7 +34,21 @@ final class ReportBuilder
             'flags' => ['debug' => (bool) config('app.debug'), 'environment' => (string) $this->app->environment()],
             'extra' => (object) $this->app->make(OperationalData::class)->report(),
             'error_log' => $this->errorLog(),
+            ...$this->npm(),
         ];
+    }
+
+    /**
+     * The JavaScript packages from the lockfile (#141); left out when the app
+     * has no package.json.
+     *
+     * @return array{npm?: array<string, mixed>}
+     */
+    private function npm(): array
+    {
+        $npm = (new NpmPackages($this->basePath ?? $this->app->basePath()))->report();
+
+        return $npm === null ? [] : ['npm' => $npm];
     }
 
     /**

@@ -47,6 +47,16 @@ Kommandozeile (Cron, Queue-Worker) können abweichen. Weil Laravel `display_erro
 meldet er dafür den Wert aus der PHP-Konfiguration: Er greift, wenn ein Fehler vor dem Start passiert.
 Ist `opcache_get_status()` per `opcache.restrict_api` gesperrt, bleibt der Füllstand unbekannt.
 
+## npm-Pakete
+
+Ab 1.6.0 meldet er die JavaScript-Pakete der App, damit das Dashboard sie auf Sicherheitslücken prüfen kann.
+Er liest dafür nur das Lockfile neben der `package.json`: `package-lock.json` (Version 1 bis 3),
+`pnpm-lock.yaml` oder `yarn.lock`, in dieser Reihenfolge. Gemeldet werden alle installierten Pakete, auch
+transitive, mit Version und ob sie nur für die Entwicklung gebraucht werden (höchstens 5000). `yarn.lock` und
+pnpm ab Lockfile-Version 9 vermerken das nicht; dort gelten nur die direkten `devDependencies` aus der
+`package.json` als Entwicklungs-Abhängigkeit. Liegt kein Lockfile auf dem Server, etwa weil die Assets in der
+CI gebaut werden, meldet er das; ohne `package.json` entfällt der Teil.
+
 ## Sicherheit
 
 - Jede Anfrage muss per HMAC-SHA256 signiert sein. Timestamp (±300 s) und Nonce werden geprüft, eine Nonce ist nur einmal gültig.

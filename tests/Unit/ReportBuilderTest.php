@@ -19,7 +19,19 @@ it('builds the report from composer files', function () {
 it('tolerates missing composer files', function () {
     $report = (new ReportBuilder(app(), '/nonexistent'))->build();
 
-    expect($report['packages'])->toBe([]);
+    expect($report['packages'])->toBe([])
+        ->and($report)->not->toHaveKey('npm');
+});
+
+it('reports the npm packages from the lockfile', function () {
+    expect(app(ReportBuilder::class)->build()['npm'])->toBe([
+        'lockfile' => 'package-lock.json',
+        'truncated' => false,
+        'packages' => [
+            ['name' => 'axios', 'version' => '1.7.2', 'dev' => false],
+            ['name' => 'vite', 'version' => '5.2.0', 'dev' => true],
+        ],
+    ]);
 });
 
 it('reports the errors of the configured log, without messages when switched off', function () {

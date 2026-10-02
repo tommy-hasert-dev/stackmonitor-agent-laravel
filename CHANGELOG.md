@@ -5,6 +5,16 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.6.0] - 2026-10-02
+
+### Added
+
+- Reports the JavaScript packages from the app's lockfile in the new field
+  `npm`: `package-lock.json` (v1 to v3), `pnpm-lock.yaml` or `yarn.lock`, every
+  installed package with its version and whether it is only a development
+  dependency. Without a lockfile on the server `lockfile` is `null`; without a
+  `package.json` the field is left out.
+
 ## [1.5.0] - 2026-10-02
 
 ### Added
