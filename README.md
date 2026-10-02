@@ -1,6 +1,7 @@
 # StackMonitor Agent für Laravel
 
-Nur lesender Agent. Er liefert dem StackMonitor-Dashboard Laravel-, PHP- und Paketversionen.
+Nur lesender Agent. Er liefert dem StackMonitor-Dashboard Laravel-, PHP- und Paketversionen sowie die Fehler
+der letzten 24 Stunden aus dem Log.
 Unterstützt Laravel 10–13 und PHP ≥ 8.1.
 
 ## Installation
@@ -14,6 +15,17 @@ Unterstützt Laravel 10–13 und PHP ≥ 8.1.
    `php artisan route:cache` erneut ausgeführt werden — sonst greift weiterhin die alte, gecachte Konfiguration.
 
 Der Endpunkt ist `GET /stackmonitor/status`. Der Pfad lässt sich mit `STACKMONITOR_AGENT_PATH` ändern, dann muss die Agent-URL im Dashboard angepasst werden.
+
+## Fehler im Log
+
+Der Agent zählt die Einträge ab Level `error` der letzten 24 Stunden im Datei-Log der App: im Default-Kanal,
+wenn er `single` oder `daily` ist, sonst im ersten solchen Kanal eines Stacks. Gelesen werden höchstens die
+letzten 5 MB. Andere Kanäle (stderr, Sentry, Papertrail …) meldet er als „nicht auswertbar“.
+
+Mitgeschickt werden die drei häufigsten Meldungen, nur die erste Zeile ohne Kontext und Stacktrace, auf 200
+Zeichen gekürzt. E-Mail-Adressen, URLs, Werte in Anführungszeichen, IDs, Tokens, IP-Adressen, Zahlen, SQL und
+Verzeichnisse ersetzt er vorher. Mit `STACKMONITOR_AGENT_LOG_MESSAGES=false` in der `.env` gehen nur die
+Anzahlen raus.
 
 ## Sicherheit
 

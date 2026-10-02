@@ -3,11 +3,12 @@
 namespace StackMonitor\Agent;
 
 use Illuminate\Contracts\Foundation\Application;
+use StackMonitor\Agent\ErrorLog\ErrorLog;
 use stdClass;
 
 final class ReportBuilder
 {
-    public const AGENT_VERSION = '1.1.0';
+    public const AGENT_VERSION = '1.2.0';
 
     /** What composer.lock records for a package installed from packagist.org. */
     private const PACKAGIST_NOTIFICATION_URL = 'https://packagist.org/downloads/';
@@ -33,7 +34,26 @@ final class ReportBuilder
             'packages' => $this->packages(),
             'flags' => ['debug' => (bool) config('app.debug'), 'environment' => (string) $this->app->environment()],
             'extra' => new stdClass,
+            'error_log' => $this->errorLog(),
         ];
+    }
+
+    /**
+     * Errors of the last 24 hours (#81); the messages can be switched off with
+     * STACKMONITOR_AGENT_LOG_MESSAGES=false, the counts are always sent.
+     *
+     * @return array<string, mixed>
+     */
+    private function errorLog(): array
+    {
+        $channels = config('logging.channels');
+
+        return (new ErrorLog(
+            is_array($channels) ? $channels : [],
+            (string) config('logging.default'),
+            date_default_timezone_get(),
+            (bool) config('stackmonitor-agent.log_messages', true),
+        ))->report();
     }
 
     /**

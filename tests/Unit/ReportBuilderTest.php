@@ -21,3 +21,24 @@ it('tolerates missing composer files', function () {
 
     expect($report['packages'])->toBe([]);
 });
+
+it('reports the errors of the configured log, without messages when switched off', function () {
+    $dir = sys_get_temp_dir().'/sm-report-'.bin2hex(random_bytes(4));
+    mkdir($dir);
+    file_put_contents($dir.'/laravel.log', '['.date('Y-m-d H:i:s').'] testing.ERROR: Boom'."\n");
+    config([
+        'logging.default' => 'stack',
+        'logging.channels.stack' => ['driver' => 'stack', 'channels' => ['single']],
+        'logging.channels.single' => ['driver' => 'single', 'path' => $dir.'/laravel.log'],
+        'stackmonitor-agent.log_messages' => false,
+    ]);
+
+    $log = app(ReportBuilder::class)->build()['error_log'];
+
+    unlink($dir.'/laravel.log');
+    rmdir($dir);
+
+    expect($log['status'])->toBe('ok')
+        ->and($log['errors'])->toBe(1)
+        ->and($log['top'])->toBeNull();
+});
