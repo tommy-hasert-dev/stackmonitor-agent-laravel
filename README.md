@@ -1,7 +1,7 @@
 # StackMonitor Agent für Laravel
 
-Nur lesender Agent. Er liefert dem StackMonitor-Dashboard Laravel-, PHP- und Paketversionen sowie die Fehler
-der letzten 24 Stunden aus dem Log.
+Nur lesender Agent. Er liefert dem StackMonitor-Dashboard Laravel-, PHP- und Paketversionen, die Fehler
+der letzten 24 Stunden aus dem Log und Betriebsdaten, die nur der Server sieht.
 Unterstützt Laravel 10–13 und PHP ≥ 8.1.
 
 ## Installation
@@ -26,6 +26,14 @@ Mitgeschickt werden die drei häufigsten Meldungen, nur die erste Zeile ohne Kon
 Zeichen gekürzt. E-Mail-Adressen, URLs, Werte in Anführungszeichen, IDs, Tokens, IP-Adressen, Zahlen, SQL und
 Verzeichnisse ersetzt er vorher. Mit `STACKMONITOR_AGENT_LOG_MESSAGES=false` in der `.env` gehen nur die
 Anzahlen raus.
+
+## Betriebsdaten
+
+Ab 1.3.0 meldet der Agent zusätzlich: fehlgeschlagene Jobs, wartende Jobs der Standard-Queue (nicht beim
+Treiber `sync`; erst ab Laravel-Versionen mit `pendingSize()`, sonst „unbekannt“), wann der Scheduler zuletzt lief, freien Speicherplatz, noch nicht gelaufene Migrationen und ob
+Config und Routen gecacht sind. Für den Scheduler merkt er sich jeden Start von `schedule:run` im Standard-Cache
+der App; bis zum ersten Lauf nach der Installation meldet er „noch kein Lauf“. Was er nicht lesen kann, meldet er
+als unbekannt.
 
 ## Sicherheit
 

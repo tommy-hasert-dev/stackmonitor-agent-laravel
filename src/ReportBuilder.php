@@ -4,11 +4,10 @@ namespace StackMonitor\Agent;
 
 use Illuminate\Contracts\Foundation\Application;
 use StackMonitor\Agent\ErrorLog\ErrorLog;
-use stdClass;
 
 final class ReportBuilder
 {
-    public const AGENT_VERSION = '1.2.0';
+    public const AGENT_VERSION = '1.3.0';
 
     /** What composer.lock records for a package installed from packagist.org. */
     private const PACKAGIST_NOTIFICATION_URL = 'https://packagist.org/downloads/';
@@ -33,7 +32,7 @@ final class ReportBuilder
             'php' => PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'.'.PHP_RELEASE_VERSION,
             'packages' => $this->packages(),
             'flags' => ['debug' => (bool) config('app.debug'), 'environment' => (string) $this->app->environment()],
-            'extra' => new stdClass,
+            'extra' => (object) $this->app->make(OperationalData::class)->report(),
             'error_log' => $this->errorLog(),
         ];
     }

@@ -50,7 +50,7 @@ it('returns a signed report that matches the shared schema', function () {
     $schema = file_get_contents(__DIR__.'/../../../../schema/agent-report.v1.json');
     $result = (new Validator)->validate(json_decode($body), $schema);
     expect($result->isValid())->toBeTrue();
-    expect($body)->toContain('"extra":{}');
+    expect(json_decode($body, true)['extra'])->toHaveKeys(['scheduler', 'disk', 'migrations_pending', 'config_cached', 'routes_cached']);
 });
 
 it('rejects invalid requests with 404', function (Closure $headers) {

@@ -2,6 +2,8 @@
 
 namespace StackMonitor\Agent;
 
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 final class AgentServiceProvider extends ServiceProvider
@@ -18,5 +20,12 @@ final class AgentServiceProvider extends ServiceProvider
         ], 'stackmonitor-agent-config');
 
         $this->loadRoutesFrom(__DIR__.'/../routes/agent.php');
+
+        // When the scheduler last ran (#60): Laravel doesn't record it.
+        Event::listen(function (CommandStarting $event) {
+            if ($event->command === 'schedule:run') {
+                $this->app->make(SchedulerHeartbeat::class)->record();
+            }
+        });
     }
 }
