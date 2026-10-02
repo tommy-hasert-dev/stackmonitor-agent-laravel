@@ -35,6 +35,11 @@ Config und Routen gecacht sind. Für den Scheduler merkt er sich jeden Start von
 der App; bis zum ersten Lauf nach der Installation meldet er „noch kein Lauf“. Was er nicht lesen kann, meldet er
 als unbekannt.
 
+Ab 1.4.0 meldet er außerdem die letzte Sicherung von `spatie/laravel-backup`, falls die App es nutzt: die neueste
+Backup-Datei auf den konfigurierten Disks mit dem Treiber `local`. Entfernte Disks (S3, FTP …) fragt er nicht ab,
+das kostete bei jedem Bericht einen Netzwerkzugriff; sichert die App nur dorthin, meldet er den Zeitpunkt als
+unbekannt.
+
 ## Sicherheit
 
 - Jede Anfrage muss per HMAC-SHA256 signiert sein. Timestamp (±300 s) und Nonce werden geprüft, eine Nonce ist nur einmal gültig.

@@ -9,7 +9,7 @@ use Throwable;
 /**
  * What only the server sees (#60), sent in the report's `extra`: failed and
  * waiting jobs, the last scheduler run, free disk space, migrations not run
- * yet and whether config and routes are cached. A value the agent can't
+ * yet, whether config and routes are cached and the last backup (#64). A value the agent can't
  * read is null; one that doesn't apply (no failed-jobs store, sync queue)
  * is left out.
  */
@@ -49,6 +49,7 @@ final class OperationalData
             'migrations_pending' => $this->attempt(fn () => $this->migrationsPending()),
             'config_cached' => $this->app->configurationIsCached(),
             'routes_cached' => $this->app->routesAreCached(),
+            'backup' => $this->attempt(fn () => $this->app->make(Backups::class)->report()),
         ];
     }
 
