@@ -60,6 +60,11 @@ docker compose run --rm -w /app/agents/laravel tools composer install
 docker compose run --rm -w /app/agents/laravel tools composer test   # Pint und Pest
 ```
 
+## Änderungen
+
+Was sich zwischen den Versionen geändert hat, steht in [`CHANGELOG.md`](CHANGELOG.md) (Englisch) und in den
+GitHub-Releases.
+
 ## Lizenz
 
 MIT, siehe `LICENSE`.
