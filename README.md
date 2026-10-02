@@ -40,6 +40,13 @@ Backup-Datei auf den konfigurierten Disks mit dem Treiber `local`. Entfernte Dis
 das kostete bei jedem Bericht einen Netzwerkzugriff; sichert die App nur dorthin, meldet er den Zeitpunkt als
 unbekannt.
 
+Ab 1.5.0 meldet er die PHP-Einstellungen des Webservers: SAPI, OPcache mit Füllstand, `memory_limit`,
+`max_execution_time`, `upload_max_filesize`, `post_max_size`, `display_errors`, `error_reporting`,
+`date.timezone` und die Namen der geladenen Erweiterungen. Das Dashboard fragt per HTTP, die Werte der
+Kommandozeile (Cron, Queue-Worker) können abweichen. Weil Laravel `display_errors` beim Start abschaltet,
+meldet er dafür den Wert aus der PHP-Konfiguration: Er greift, wenn ein Fehler vor dem Start passiert.
+Ist `opcache_get_status()` per `opcache.restrict_api` gesperrt, bleibt der Füllstand unbekannt.
+
 ## Sicherheit
 
 - Jede Anfrage muss per HMAC-SHA256 signiert sein. Timestamp (±300 s) und Nonce werden geprüft, eine Nonce ist nur einmal gültig.

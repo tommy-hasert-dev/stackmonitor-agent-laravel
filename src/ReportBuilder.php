@@ -7,7 +7,7 @@ use StackMonitor\Agent\ErrorLog\ErrorLog;
 
 final class ReportBuilder
 {
-    public const AGENT_VERSION = '1.4.0';
+    public const AGENT_VERSION = '1.5.0';
 
     /** What composer.lock records for a package installed from packagist.org. */
     private const PACKAGIST_NOTIFICATION_URL = 'https://packagist.org/downloads/';

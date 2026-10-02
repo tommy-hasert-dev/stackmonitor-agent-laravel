@@ -5,6 +5,16 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.5.0] - 2026-10-02
+
+### Added
+
+- Reports the PHP settings of the web server in `extra.php_config`: SAPI,
+  OPcache with its fill level, `memory_limit`, `max_execution_time`,
+  `upload_max_filesize`, `post_max_size`, `display_errors` from the PHP
+  configuration, `error_reporting`, `date.timezone` and the names of the
+  loaded extensions.
+
 ## [1.4.0] - 2026-10-02
 
 ### Added
