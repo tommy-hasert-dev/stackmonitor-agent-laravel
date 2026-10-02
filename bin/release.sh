@@ -60,7 +60,9 @@ if [ -n "$(git ls-remote --tags "${SPLIT_REMOTE}" "refs/tags/v${VERSION}")" ]; t
 fi
 
 echo "==> Running the agent's checks (tools container)"
-docker compose run --rm -w /app/${PREFIX} tools composer test
+# Without -T and </dev/null the container eats stdin, and an answer piped in for
+# the prompt below (echo y | release.sh ...) never reaches `read`.
+docker compose run --rm -T -w /app/${PREFIX} tools composer test </dev/null
 
 echo "==> Splitting ${PREFIX}"
 SPLIT="$(git subtree split --prefix="${PREFIX}" 2>/dev/null)"
