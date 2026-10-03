@@ -47,6 +47,16 @@ Kommandozeile (Cron, Queue-Worker) können abweichen. Weil Laravel `display_erro
 meldet er dafür den Wert aus der PHP-Konfiguration: Er greift, wenn ein Fehler vor dem Start passiert.
 Ist `opcache_get_status()` per `opcache.restrict_api` gesperrt, bleibt der Füllstand unbekannt.
 
+## Geplante Aufgaben
+
+Ab 1.7.0 meldet er jede geplante Aufgabe des Schedulers einzeln: Befehl bzw. Beschreibung, Cron-Ausdruck,
+Zeitzone und den letzten Lauf mit Start, Ende, Ergebnis, Exit-Code, kurzer Fehlermeldung und den Dauern der
+letzten 10 erfolgreichen Läufe. Er hört dafür auf die Ereignisse des Schedulers und merkt sich die Läufe im
+Standard-Cache der App; bei Aufgaben mit `runInBackground()` zählt das Ende über `schedule:finish`. Eine Aufgabe
+erkennt er am Befehl mit Argumenten (eine Closure an ihrer Beschreibung), nicht am Zeitplan. Läuft die App auf
+mehreren Servern, muss der Cache geteilt sein (Redis, Datenbank), sonst sieht jeder Agent nur die Läufe seines
+Servers – `onOneServer()` verlangt das ohnehin.
+
 ## npm-Pakete
 
 Ab 1.6.0 meldet er die JavaScript-Pakete der App, damit das Dashboard sie auf Sicherheitslücken prüfen kann.

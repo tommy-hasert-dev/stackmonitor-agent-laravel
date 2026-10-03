@@ -3,6 +3,11 @@
 namespace StackMonitor\Agent;
 
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Console\Events\ScheduledBackgroundTaskFinished;
+use Illuminate\Console\Events\ScheduledTaskFailed;
+use Illuminate\Console\Events\ScheduledTaskFinished;
+use Illuminate\Console\Events\ScheduledTaskSkipped;
+use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
@@ -49,7 +54,14 @@ final class AgentServiceProvider extends ServiceProvider
         Event::listen(function (CommandStarting $event) {
             if ($event->command === 'schedule:run') {
                 $this->app->make(SchedulerHeartbeat::class)->record();
+                $this->app->make(ScheduledTasks::class)->recordSchedule();
             }
         });
+
+        // The last run of every scheduled task (#138).
+        Event::listen(
+            [ScheduledTaskStarting::class, ScheduledTaskFinished::class, ScheduledTaskFailed::class, ScheduledTaskSkipped::class, ScheduledBackgroundTaskFinished::class],
+            fn (object $event) => $this->app->make(ScheduledTasks::class)->record($event),
+        );
     }
 }

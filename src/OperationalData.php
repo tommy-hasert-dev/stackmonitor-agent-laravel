@@ -9,8 +9,8 @@ use Throwable;
 /**
  * What only the server sees (#60), sent in the report's `extra`: failed and
  * waiting jobs, the last scheduler run, free disk space, migrations not run
- * yet, whether config and routes are cached, the last backup (#64) and the
- * PHP settings (#140). A value the agent can't read is null; one that doesn't
+ * yet, whether config and routes are cached, the last backup (#64), the
+ * PHP settings (#140) and every scheduled task with its last run (#138). A value the agent can't read is null; one that doesn't
  * apply (no failed-jobs store, sync queue) is left out.
  */
 final class OperationalData
@@ -51,6 +51,7 @@ final class OperationalData
             'routes_cached' => $this->app->routesAreCached(),
             'backup' => $this->attempt(fn () => $this->app->make(Backups::class)->report()),
             'php_config' => $this->attempt(fn () => $this->app->make(PhpConfig::class)->report()),
+            'scheduled_tasks' => $this->attempt(fn () => $this->app->make(ScheduledTasks::class)->report()),
         ];
     }
 

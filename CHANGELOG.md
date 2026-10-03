@@ -5,6 +5,18 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.7.0] - 2026-10-03
+
+### Added
+
+- Reports every task of the app's scheduler in the new field
+  `scheduled_tasks`: command or description, cron expression, time zone,
+  whether it runs in the background, since when it is scheduled and its last
+  run with start, end, result, exit code, a short error message and the
+  durations of the last 10 successful runs. The agent keeps them in the app's
+  default cache from the scheduler's events; a background task ends with
+  `schedule:finish`. Tasks for other environments are left out.
+
 ## [1.6.1] - 2026-10-03
 
 ### Fixed
