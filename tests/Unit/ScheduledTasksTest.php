@@ -12,7 +12,7 @@ use StackMonitor\Agent\ScheduledTasks;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
 
-function scheduledTasks(): array
+function scheduledTasks(): ?array
 {
     return app(ScheduledTasks::class)->report();
 }
@@ -52,6 +52,62 @@ it('leaves out tasks for other environments', function () {
     app(Schedule::class)->command('about')->hourly();
 
     expect(array_column(scheduledTasks(), 'command'))->toBe(['about']);
+});
+
+it('reports the tasks schedule:run saw, when only the console kernel registers them', function () {
+    app(Schedule::class)->command('inspire --quiet')->dailyAt('03:00')->timezone('Europe/Berlin');
+    app(Schedule::class)->call(fn () => null)->name('Bereinigen')->everyThirtySeconds();
+    app(Schedule::class)->exec('rm -rf /tmp/cache')->hourly()->runInBackground();
+    $this->travelTo('2026-10-03 08:00:00');
+    scheduleRunStarts();
+
+    // An HTTP request: routes/console.php isn't loaded, the schedule is empty.
+    app()->instance(Schedule::class, new Schedule);
+
+    $tasks = scheduledTasks();
+
+    expect($tasks)->toHaveCount(3)
+        ->and($tasks[0])->toMatchArray([
+            'id' => sha1('inspire --quiet'), 'command' => 'inspire --quiet', 'description' => null,
+            'expression' => '0 3 * * *', 'repeat_seconds' => null, 'timezone' => 'Europe/Berlin',
+            'background' => false, 'since' => '2026-10-03T08:00:00+00:00',
+        ])
+        ->and($tasks[1])->toMatchArray(['command' => 'Bereinigen', 'repeat_seconds' => 30])
+        ->and($tasks[2])->toMatchArray(['command' => 'rm -rf /tmp/cache', 'background' => true]);
+});
+
+it('reports the runs of tasks only the console kernel registers', function () {
+    $task = app(Schedule::class)->command('inspire')->hourly();
+    scheduleRunStarts();
+    event(new ScheduledTaskStarting($task));
+    event(new ScheduledTaskFinished($task, 2.0));
+
+    app()->instance(Schedule::class, new Schedule);
+
+    expect(scheduledTasks()[0]['last_run'])->toMatchArray(['status' => 'ok', 'duration' => 2.0]);
+});
+
+it('follows the schedule as of the last scheduler run', function () {
+    app(Schedule::class)->command('inspire')->hourly();
+    app(Schedule::class)->command('about')->hourly();
+    scheduleRunStarts();
+
+    app()->instance(Schedule::class, new Schedule);
+    app(Schedule::class)->command('about')->daily();
+    scheduleRunStarts();
+
+    expect(scheduledTasks())->toHaveCount(1)
+        ->and(scheduledTasks()[0])->toMatchArray(['command' => 'about', 'expression' => '0 0 * * *']);
+});
+
+it('reports no list before the first scheduler run when the request sees no schedule', function () {
+    expect(scheduledTasks())->toBeNull();
+});
+
+it('reports an empty list once the scheduler ran without tasks', function () {
+    scheduleRunStarts();
+
+    expect(scheduledTasks())->toBe([]);
 });
 
 it('notes since when a task is scheduled, from the first scheduler run that saw it', function () {

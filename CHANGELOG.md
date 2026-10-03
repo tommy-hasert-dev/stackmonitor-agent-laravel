@@ -5,6 +5,17 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.7.1] - 2026-10-03
+
+### Fixed
+
+- `scheduled_tasks` was always empty for apps that define their schedule in
+  `routes/console.php` (the default since Laravel 11), because only the
+  console kernel loads that file. The agent now keeps the tasks as
+  `schedule:run` sees them in the cache and reports them from there. Until
+  the first scheduler run after the update the field is `null` when the
+  request itself sees no schedule.
+
 ## [1.7.0] - 2026-10-03
 
 ### Added

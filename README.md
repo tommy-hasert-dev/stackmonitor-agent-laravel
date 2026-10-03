@@ -57,6 +57,10 @@ erkennt er am Befehl mit Argumenten (eine Closure an ihrer Beschreibung), nicht 
 mehreren Servern, muss der Cache geteilt sein (Redis, Datenbank), sonst sieht jeder Agent nur die Läufe seines
 Servers – `onOneServer()` verlangt das ohnehin.
 
+Die Liste der Aufgaben stammt ab 1.7.1 aus dem letzten `schedule:run`, nicht aus dem Request: Steht der Schedule
+in `routes/console.php` (Standard seit Laravel 11), lädt nur die Konsole ihn. Bis zum ersten Lauf des Schedulers
+nach der Installation fehlt die Liste deshalb.
+
 ## npm-Pakete
 
 Ab 1.6.0 meldet er die JavaScript-Pakete der App, damit das Dashboard sie auf Sicherheitslücken prüfen kann.

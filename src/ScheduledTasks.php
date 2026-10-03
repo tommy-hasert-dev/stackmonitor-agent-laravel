@@ -26,6 +26,10 @@ use Throwable;
  * A task is known by its command with arguments (a callback by its
  * description), not by its cron expression: moving it to another time keeps
  * its history. Background tasks end with `schedule:finish`, not right away.
+ *
+ * The list of tasks comes from the last `schedule:run` too (#167): apps on
+ * Laravel 11+ define their schedule in `routes/console.php`, which only the
+ * console kernel loads, so an HTTP request sees an empty schedule.
  */
 final class ScheduledTasks
 {
@@ -33,6 +37,9 @@ final class ScheduledTasks
 
     /** Since when each task has been scheduled, by id. */
     public const SINCE_KEY = 'stackmonitor-agent:tasks-since';
+
+    /** The tasks as the last `schedule:run` saw them, by id. */
+    public const SCHEDULE_KEY = 'stackmonitor-agent:schedule';
 
     /** Durations of successful runs kept per task, for the dashboard's average. */
     public const DURATIONS = 10;
@@ -46,7 +53,7 @@ final class ScheduledTasks
     public function __construct(private readonly Application $app) {}
 
     /**
-     * Notes new tasks with the time they first showed up, when `schedule:run`
+     * Notes the tasks with the time they first showed up, when `schedule:run`
      * starts; written only when the schedule changed.
      */
     public function recordSchedule(): void
@@ -55,14 +62,19 @@ final class ScheduledTasks
             $since = $this->cache()->get(self::SINCE_KEY);
             $since = is_array($since) ? $since : [];
             $now = now()->getTimestamp();
+            $schedule = $this->schedule();
             $current = [];
 
-            foreach (array_keys($this->tasks()) as $id) {
+            foreach (array_keys($schedule) as $id) {
                 $current[$id] = is_int($since[$id] ?? null) ? $since[$id] : $now;
             }
 
             if ($current !== $since) {
                 $this->cache()->forever(self::SINCE_KEY, $current);
+            }
+
+            if ($schedule !== $this->cache()->get(self::SCHEDULE_KEY)) {
+                $this->cache()->forever(self::SCHEDULE_KEY, $schedule);
             }
         });
     }
@@ -111,29 +123,40 @@ final class ScheduledTasks
 
     /**
      * The tasks that run in this environment with their last run, in the
-     * order the app schedules them.
+     * order the app schedules them: as the last `schedule:run` saw them, or
+     * as this request does before that. Null before the first run when the
+     * request sees no schedule.
      *
-     * @return list<array<string, mixed>>
+     * @return list<array<string, mixed>>|null
      */
-    public function report(): array
+    public function report(): ?array
     {
+        $schedule = $this->cache()->get(self::SCHEDULE_KEY);
+        $schedule = is_array($schedule) ? $schedule : ($this->schedule() ?: null);
+
+        if ($schedule === null) {
+            return null;
+        }
+
         $since = $this->cache()->get(self::SINCE_KEY);
         $report = [];
 
-        foreach (array_slice($this->tasks(), 0, self::MAX_TASKS, true) as $id => $task) {
+        foreach (array_slice($schedule, 0, self::MAX_TASKS, true) as $id => $task) {
+            if (! is_string($id) || ! is_array($task) || ! is_string($task['command'] ?? null) || ! is_string($task['expression'] ?? null)) {
+                continue;
+            }
+
             $run = $this->cache()->get(self::CACHE_PREFIX.$id);
             $run = is_array($run) ? $run : [];
-            $timezone = $task->timezone instanceof DateTimeZone ? $task->timezone->getName() : $task->timezone;
-            $command = $this->command($task);
 
             $report[] = [
                 'id' => $id,
-                'command' => mb_substr($command, 0, 2000),
-                'description' => is_string($task->description) && $task->description !== $command ? mb_substr($task->description, 0, 500) : null,
-                'expression' => $task->getExpression(),
-                'repeat_seconds' => isset($task->repeatSeconds) && is_int($task->repeatSeconds) ? $task->repeatSeconds : null,
-                'timezone' => is_string($timezone) && $timezone !== '' ? $timezone : (string) config('app.timezone', 'UTC'),
-                'background' => (bool) $task->runInBackground,
+                'command' => $task['command'],
+                'description' => is_string($task['description'] ?? null) ? $task['description'] : null,
+                'expression' => $task['expression'],
+                'repeat_seconds' => is_int($task['repeat_seconds'] ?? null) ? $task['repeat_seconds'] : null,
+                'timezone' => is_string($task['timezone'] ?? null) ? $task['timezone'] : (string) config('app.timezone', 'UTC'),
+                'background' => (bool) ($task['background'] ?? false),
                 'since' => is_int($since[$id] ?? null) ? date(DATE_ATOM, $since[$id]) : null,
                 'last_run' => is_float($run['started_at'] ?? null) && is_string($run['status'] ?? null) ? [
                     'started_at' => date(DATE_ATOM, (int) $run['started_at']),
@@ -149,6 +172,32 @@ final class ScheduledTasks
         }
 
         return $report;
+    }
+
+    /**
+     * The tasks that run in this environment as the report shows them, by id.
+     *
+     * @return array<string, array{command: string, description: string|null, expression: string, repeat_seconds: int|null, timezone: string, background: bool}>
+     */
+    private function schedule(): array
+    {
+        $schedule = [];
+
+        foreach ($this->tasks() as $id => $task) {
+            $timezone = $task->timezone instanceof DateTimeZone ? $task->timezone->getName() : $task->timezone;
+            $command = $this->command($task);
+
+            $schedule[$id] = [
+                'command' => mb_substr($command, 0, 2000),
+                'description' => is_string($task->description) && $task->description !== $command ? mb_substr($task->description, 0, 500) : null,
+                'expression' => $task->getExpression(),
+                'repeat_seconds' => isset($task->repeatSeconds) && is_int($task->repeatSeconds) ? $task->repeatSeconds : null,
+                'timezone' => is_string($timezone) && $timezone !== '' ? $timezone : (string) config('app.timezone', 'UTC'),
+                'background' => (bool) $task->runInBackground,
+            ];
+        }
+
+        return $schedule;
     }
 
     /**

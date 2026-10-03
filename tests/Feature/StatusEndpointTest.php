@@ -1,9 +1,13 @@
 <?php
 
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Route;
 use Opis\JsonSchema\Validator;
 use StackMonitor\Agent\Signature;
 use StackMonitor\Agent\Tests\TestCase;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 
 /**
  * @return array<string, string>
@@ -52,6 +56,25 @@ it('returns a signed report that matches the shared schema', function () {
     $result = (new Validator)->validate(json_decode($body), $schema);
     expect($result->isValid())->toBeTrue();
     expect(json_decode($body, true)['extra'])->toHaveKeys(['scheduler', 'disk', 'migrations_pending', 'config_cached', 'routes_cached']);
+});
+
+it('reports the scheduled tasks when only the console kernel registers the schedule', function () {
+    // Laravel 11+ apps schedule in routes/console.php, which HTTP requests don't load.
+    app(Schedule::class)->call(fn () => null)->name('Bereinigen')->everyMinute();
+    app(Schedule::class)->command('inspire')->daily();
+    // The console kernel fires CommandStarting, $this->artisan() doesn't.
+    event(new CommandStarting('schedule:run', new ArrayInput([]), new NullOutput));
+    $this->artisan('schedule:run');
+    app()->instance(Schedule::class, new Schedule);
+
+    $body = $this->get('/stackmonitor/status', signedHeaders())->assertOk()->getContent();
+
+    $schema = file_get_contents(__DIR__.'/../../../../schema/agent-report.v1.json');
+    $extra = json_decode($body, true)['extra'];
+    expect((new Validator)->validate(json_decode($body), $schema)->isValid())->toBeTrue()
+        ->and($extra['scheduler']['tasks'])->toBe(2)
+        ->and(array_column($extra['scheduled_tasks'], 'command'))->toBe(['Bereinigen', 'inspire'])
+        ->and($extra['scheduled_tasks'][0]['last_run']['status'])->toBe('ok');
 });
 
 it('rejects invalid requests with 404', function (Closure $headers) {
