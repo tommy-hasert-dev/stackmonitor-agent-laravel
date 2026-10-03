@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Auth\Events\Attempting;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Schema\Blueprint;
@@ -164,6 +165,15 @@ it('reports migrations as unknown without a migrations table', function () {
 
 it('reports whether config and routes are cached', function () {
     expect(operationalData())->toMatchArray(['config_cached' => false, 'routes_cached' => false]);
+});
+
+it('reports the failed logins once the app uses Laravel auth', function () {
+    expect(operationalData()['failed_logins'])->toBeNull();
+
+    $this->travelTo('2026-10-04 08:00:00');
+    event(new Attempting('web', ['email' => 'jane@example.com'], false));
+
+    expect(operationalData()['failed_logins'])->toBe(['since' => '2026-10-04T08:00:00+00:00', 'hours' => []]);
 });
 
 it('matches the shared schema', function () {

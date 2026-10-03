@@ -2,6 +2,8 @@
 
 namespace StackMonitor\Agent;
 
+use Illuminate\Auth\Events\Attempting;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Console\Events\ScheduledBackgroundTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskFailed;
@@ -62,6 +64,12 @@ final class AgentServiceProvider extends ServiceProvider
         Event::listen(
             [ScheduledTaskStarting::class, ScheduledTaskFinished::class, ScheduledTaskFailed::class, ScheduledTaskSkipped::class, ScheduledBackgroundTaskFinished::class],
             fn (object $event) => $this->app->make(ScheduledTasks::class)->record($event),
+        );
+
+        // Failed logins per hour, once the app logs in with Laravel's auth (#145).
+        Event::listen(
+            [Attempting::class, Failed::class],
+            fn (object $event) => $this->app->make(FailedLogins::class)->record($event),
         );
     }
 }

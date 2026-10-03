@@ -61,6 +61,17 @@ Die Liste der Aufgaben stammt ab 1.7.1 aus dem letzten `schedule:run`, nicht aus
 in `routes/console.php` (Standard seit Laravel 11), lädt nur die Konsole ihn. Bis zum ersten Lauf des Schedulers
 nach der Installation fehlt die Liste deshalb.
 
+## Fehlgeschlagene Logins
+
+Ab 1.8.0 zählt er die fehlgeschlagenen Logins pro Stunde, damit das Dashboard den Verlauf zeigt und Ausreißer
+markiert: wie viele fehlschlugen, wie viele davon für einen existierenden Benutzer (falsches Passwort) und von wie
+vielen verschiedenen Adressen. Er hört dafür auf die Ereignisse `Attempting` und `Failed` von Laravels Auth und
+merkt sich die Zahlen der letzten 14 Tage im Standard-Cache der App. Die App verlassen nur Zahlen, keine Adressen
+und keine Benutzernamen; Adressen unterscheidet er innerhalb der Stunde an einem kurzen, mit `APP_KEY`
+gebildeten Hash (höchstens 1000 pro Stunde), für vergangene Stunden bleibt nur ihre Anzahl. Bis die App
+jemanden über Laravels Auth anmelden lässt (Breeze, Jetstream/Fortify, `Auth::attempt()`), fehlt der Teil;
+Token-Guards wie der von Sanctum lösen diese Ereignisse nicht aus.
+
 ## npm-Pakete
 
 Ab 1.6.0 meldet er die JavaScript-Pakete der App, damit das Dashboard sie auf Sicherheitslücken prüfen kann.

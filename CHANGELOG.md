@@ -5,6 +5,20 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.8.0] - 2026-10-04
+
+### Added
+
+- Reports the failed logins of the last 14 days per hour in the new field
+  `failed_logins`: how many failed, how many of them for a user that exists
+  (the password was wrong) and from how many distinct addresses. The agent
+  counts Laravel's `Attempting` and `Failed` auth events in the app's default
+  cache; only the counts leave the app, no addresses or user names. Addresses
+  are told apart within the hour by a short hash keyed with `APP_KEY`, at most
+  1000 per hour. The field is `null` until the app logs someone in with
+  Laravel's auth (Breeze, Jetstream/Fortify, `Auth::attempt()`); token guards
+  such as Sanctum's fire no such events.
+
 ## [1.7.1] - 2026-10-03
 
 ### Fixed
