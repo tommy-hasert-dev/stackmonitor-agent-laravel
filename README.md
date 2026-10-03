@@ -60,7 +60,9 @@ CI gebaut werden, meldet er das; ohne `package.json` entfällt der Teil.
 ## Sicherheit
 
 - Jede Anfrage muss per HMAC-SHA256 signiert sein. Timestamp (±300 s) und Nonce werden geprüft, eine Nonce ist nur einmal gültig.
-- Ungültige Anfragen beantwortet der Endpunkt mit `404` — demselben generischen 404, das Laravel auch für unbekannte Routen liefert, damit der Endpunkt nach außen nicht auffällt. Die Antwort auf eine gültige Anfrage ist ebenfalls signiert.
+- Ungültige Anfragen beantwortet der Endpunkt mit `404` — demselben generischen 404, das Laravel auch für unbekannte Routen liefert, bei jeder HTTP-Methode, damit der Endpunkt nach außen nicht auffällt. Die Antwort auf eine gültige Anfrage ist ebenfalls signiert.
+- Bekannte Einschränkung: Mit `APP_DEBUG=true` zeigt die Fehlerseite einer abgelehnten Anfrage den Stacktrace
+  und darin den Agent. In Produktion gehört `APP_DEBUG` ohnehin auf `false`, sonst liegt die ganze Anwendung offen.
 - Der Agent ist nur lesend: keine schreibenden Aktionen, keine Session, keine Cookies.
 - Für den Replay-Schutz nutzt er den Standard-Cache der Anwendung (`cache.default`). Dieser Cache muss
   **persistent und, bei mehreren Anwendungs-Knoten, geteilt** sein (z. B. Redis oder der Datenbank-Treiber) —

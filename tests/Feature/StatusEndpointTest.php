@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
 use Opis\JsonSchema\Validator;
 use StackMonitor\Agent\Signature;
 use StackMonitor\Agent\Tests\TestCase;
@@ -87,7 +88,17 @@ it('returns a 404 indistinguishable from an unknown route', function (string $me
     'GET' => ['GET'],
     'POST' => ['POST'],
     'OPTIONS' => ['OPTIONS'],
+    // Outside Route::any()'s verbs: Laravel answers these with its own 405 (#18).
+    'PROPFIND' => ['PROPFIND'],
+    'TRACE' => ['TRACE'],
+    'made-up method' => ['FOO'],
 ]);
+
+it('keeps the 405 for unusual methods on routes of the app itself', function () {
+    Route::get('/app-route', fn () => 'ok');
+
+    $this->json('PROPFIND', '/app-route')->assertStatus(405);
+});
 
 it('ignores an unknown _sm cache-buster query parameter (M4)', function () {
     $headers = signedHeaders();

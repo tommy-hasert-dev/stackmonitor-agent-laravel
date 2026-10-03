@@ -5,6 +5,15 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.6.1] - 2026-10-03
+
+### Fixed
+
+- Requests to the endpoint with an HTTP method outside Laravel's own verbs
+  (`PROPFIND`, `TRACE` or a made-up one) get the same generic `404` as an
+  unknown path instead of Laravel's `405`, which revealed that the endpoint
+  exists.
+
 ## [1.6.0] - 2026-10-02
 
 ### Added
