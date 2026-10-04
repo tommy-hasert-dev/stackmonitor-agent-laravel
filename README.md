@@ -98,6 +98,17 @@ nach:
 
 Ist nichts davon da, meldet er keinen Deploy.
 
+## Datenbankgröße
+
+Ab 1.11.0 meldet er die Größe der Datenbank der Standard-Verbindung, damit das Dashboard das Wachstum zeigt, bevor
+das Limit des Hosters erreicht ist: die Gesamtgröße (Daten und Indizes aller Tabellen), die Zahl der Tabellen und die
+10 größten mit Größe und ungefährer Zeilenzahl, nie ihren Inhalt. MySQL und MariaDB liest er aus
+`information_schema`, sperrt der Hoster das, mit `SHOW TABLE STATUS`; Views zählen nicht mit. Bei SQLite zählt die
+Größe der Datei, die Tabellen liest er aus `dbstat`, wenn SQLite damit gebaut ist; eine Zeilenzahl schätzt SQLite
+nicht. Gemessen wird etwa einmal am Tag (alle 23 Stunden, damit bei stündlichen Reports kein Tag ausfällt), das
+Ergebnis hält der Standard-Cache der App; schlägt die Messung fehl, versucht er es nach einer Stunde wieder. Für
+andere Treiber (PostgreSQL, SQL Server) und eine Datenbank im Speicher fehlt der Wert.
+
 ## npm-Pakete
 
 Ab 1.6.0 meldet er die JavaScript-Pakete der App, damit das Dashboard sie auf Sicherheitslücken prüfen kann.

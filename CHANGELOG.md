@@ -5,6 +5,18 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.11.0] - 2026-10-04
+
+### Added
+
+- Reports the size of the app's database in the new field `database`: the
+  whole size, the number of tables and the 10 largest tables with size and
+  approximate rows. MySQL and MariaDB are read from `information_schema`, or
+  with `SHOW TABLE STATUS` where that is closed off; SQLite by the size of
+  its file. The database is measured about once a day (every 23 hours), the
+  result is kept in the app's default cache; a failed measurement is tried
+  again after an hour. `null` for other drivers and a database in memory.
+
 ## [1.10.0] - 2026-10-04
 
 ### Added
