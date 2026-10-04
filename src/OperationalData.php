@@ -10,8 +10,9 @@ use Throwable;
  * What only the server sees (#60), sent in the report's `extra`: failed and
  * waiting jobs, the last scheduler run, free disk space, migrations not run
  * yet, whether config and routes are cached, the last backup (#64), the
- * PHP settings (#140), every scheduled task with its last run (#138) and
- * the failed logins per hour (#145). A value the agent can't read is null;
+ * PHP settings (#140), every scheduled task with its last run (#138), the
+ * failed logins per hour (#145) and PHP files where only uploads belong
+ * (#144). A value the agent can't read is null;
  * one that doesn't apply (no failed-jobs store, sync queue) is left out.
  */
 final class OperationalData
@@ -54,6 +55,7 @@ final class OperationalData
             'php_config' => $this->attempt(fn () => $this->app->make(PhpConfig::class)->report()),
             'scheduled_tasks' => $this->attempt(fn () => $this->app->make(ScheduledTasks::class)->report()),
             'failed_logins' => $this->attempt(fn () => $this->app->make(FailedLogins::class)->report()),
+            'suspicious_files' => $this->attempt(fn () => $this->app->make(SuspiciousFiles::class)->report()),
         ];
     }
 

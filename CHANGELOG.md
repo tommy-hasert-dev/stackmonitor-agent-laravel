@@ -5,6 +5,19 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.9.0] - 2026-10-04
+
+### Added
+
+- Reports in the new field `suspicious_files` files that let PHP run where
+  only uploads belong: files with a PHP extension (also `.phtml`, `.phar`,
+  `.php5` …) or one hidden before the last (`bild.php.jpg`) on the public disk
+  (`storage/app/public`) and in `public/storage` when that is a folder of its
+  own, and `.htaccess` files there that hand files to PHP. Only path, size and
+  date leave the app, never the content. A large folder is looked through
+  over several reports, at most 50,000 entries and 2 seconds each; the state
+  is kept in the app's default cache.
+
 ## [1.8.0] - 2026-10-04
 
 ### Added

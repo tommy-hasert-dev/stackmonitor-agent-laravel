@@ -72,6 +72,17 @@ gebildeten Hash (höchstens 1000 pro Stunde), für vergangene Stunden bleibt nur
 jemanden über Laravels Auth anmelden lässt (Breeze, Jetstream/Fortify, `Auth::attempt()`), fehlt der Teil;
 Token-Guards wie der von Sanctum lösen diese Ereignisse nicht aus.
 
+## Verdächtige Dateien
+
+Ab 1.9.0 durchsucht er den Ordner der `public`-Disk (`storage/app/public`) mit allen Unterordnern und
+`public/storage`, wenn das ein eigener Ordner statt des üblichen Links ist, nach Dateien, die PHP ausführen
+können: PHP-Endungen (`.php`, `.phtml`, `.phar`, `.pht`, `.php3` bis `.php8`, `.phps`), eine PHP-Endung vor der
+letzten (`bild.php.jpg`) und `.htaccess`-Dateien, die Dateien an PHP geben oder `php_flag engine on` setzen. Die App
+verlassen nur Pfad, Größe und Änderungsdatum, nie der Inhalt. Eine `index.php`, die leer ist oder nur aus
+Kommentaren besteht, lässt er aus; verlinkten Ordnern folgt er nicht. Der Scan läuft beim Report, je Report aber
+höchstens 50.000 Einträge und 2 Sekunden; große Ordner werden so über mehrere Reports durchsucht, den Stand hält
+der Standard-Cache der App. Ein neuer Scan beginnt, wenn das letzte Ergebnis 30 Minuten alt ist.
+
 ## npm-Pakete
 
 Ab 1.6.0 meldet er die JavaScript-Pakete der App, damit das Dashboard sie auf Sicherheitslücken prüfen kann.
