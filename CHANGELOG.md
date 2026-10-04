@@ -5,6 +5,18 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.10.0] - 2026-10-04
+
+### Added
+
+- Reports the last deploy in the new field `deploy`: time, revision and where
+  it came from. The agent reads, in this order, a file the deploy script
+  writes (`.stackmonitor-deploy` in the app, another path with
+  `STACKMONITOR_AGENT_DEPLOY_FILE`; its modification time is the deploy, its
+  first line the revision), the commit HEAD of the Git checkout points to and
+  when its branch moved there, or when the configuration was last cached.
+  `null` when none of them is there.
+
 ## [1.9.0] - 2026-10-04
 
 ### Added

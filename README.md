@@ -83,6 +83,21 @@ Kommentaren besteht, lässt er aus; verlinkten Ordnern folgt er nicht. Der Scan 
 höchstens 50.000 Einträge und 2 Sekunden; große Ordner werden so über mehrere Reports durchsucht, den Stand hält
 der Standard-Cache der App. Ein neuer Scan beginnt, wenn das letzte Ergebnis 30 Minuten alt ist.
 
+## Deploys
+
+Ab 1.10.0 meldet er den letzten Deploy, damit das Dashboard ihn in seinen Diagrammen markiert. Er sieht nacheinander
+nach:
+
+1. **Deploy-Datei:** `.stackmonitor-deploy` im Projektordner (anderer Pfad über `STACKMONITOR_AGENT_DEPLOY_FILE`,
+   relativ zum Projekt oder absolut). Ihre Änderungszeit ist der Deploy, ihre erste Zeile, wenn vorhanden, die
+   Revision (höchstens 40 Zeichen). Das passt auch für Deploys ohne Git auf dem Server, etwa per rsync. Im
+   Deploy-Skript reicht nach dem Kopieren der Dateien z. B. `git rev-parse HEAD > .stackmonitor-deploy` (lokal
+   ausgeführt und mitkopiert) oder `touch .stackmonitor-deploy` auf dem Server.
+2. **Git:** der Commit, auf den `HEAD` zeigt, mit der Zeit, zu der der Branch dorthin gewandert ist.
+3. **Config-Cache:** wann `php artisan config:cache` zuletzt lief (`bootstrap/cache/config.php`), ohne Revision.
+
+Ist nichts davon da, meldet er keinen Deploy.
+
 ## npm-Pakete
 
 Ab 1.6.0 meldet er die JavaScript-Pakete der App, damit das Dashboard sie auf Sicherheitslücken prüfen kann.
