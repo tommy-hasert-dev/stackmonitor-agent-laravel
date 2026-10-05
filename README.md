@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="art/stackmonitor-logo-on-dark.svg">
+  <img src="art/stackmonitor-logo-on-light.svg" alt="StackMonitor" height="48">
+</picture>
+
 # StackMonitor Agent für Laravel
 
 Nur lesender Agent. Er liefert dem StackMonitor-Dashboard Laravel-, PHP- und Paketversionen, die Fehler
