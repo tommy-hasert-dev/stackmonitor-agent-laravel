@@ -127,3 +127,115 @@ it('goes into the operational data and matches the schema', function () {
     expect($extra['suspicious_files']['total'])->toBe(1)
         ->and((new Validator)->validate(json_decode(json_encode($report)), $schema)->isValid())->toBeTrue();
 });
+
+function stateAfterScan(string $base): array
+{
+    suspiciousReport($base);
+
+    return cache()->get(SuspiciousFiles::CACHE_KEY);
+}
+
+/** Named apart from PHP's own readfile(), which function names would clash with. */
+function readScanned(array $state, string $path, string $base, int $max = SuspiciousFiles::MAX_CONTENT_BYTES): ?array
+{
+    return SuspiciousFiles::read($state, hash('sha256', $path), [$base.'/storage/app/public'], $max);
+}
+
+it('keeps the absolute path in its cache but never sends it', function () {
+    $base = suspiciousApp(['storage/app/public/shell.php' => '<?php system($_GET["c"]);']);
+
+    $report = suspiciousReport($base);
+    $state = cache()->get(SuspiciousFiles::CACHE_KEY);
+
+    expect($state['last']['files'][0]['abs'])->toBe($base.'/storage/app/public/shell.php')
+        ->and($report['files'][0])->not->toHaveKey('abs')
+        ->and(json_encode($report))->not->toContain($base);
+});
+
+it('says in the report whether file contents may be read', function (mixed $config, bool $expected) {
+    config(['stackmonitor-agent.file_contents' => $config]);
+    $base = suspiciousApp(['storage/app/public/a.jpg' => 'x']);
+
+    expect(suspiciousReport($base)['contents'])->toBe($expected);
+})->with([
+    'off by default' => [null, false],
+    'false' => [false, false],
+    'true' => [true, true],
+    'string from the .env' => ['true', true],
+]);
+
+it('reads the start of a file of the last scan by the hash of its path', function () {
+    $code = '<?php system($_GET["c"]);';
+    $base = suspiciousApp(['storage/app/public/avatars/shell.php' => $code]);
+
+    $file = readScanned(stateAfterScan($base), 'storage/app/public/avatars/shell.php', $base);
+
+    expect($file)->toBe([
+        'path_hash' => hash('sha256', 'storage/app/public/avatars/shell.php'),
+        'size' => strlen($code),
+        'sha256' => hash('sha256', $code),
+        'truncated' => false,
+        'content' => base64_encode($code),
+    ]);
+});
+
+it('cuts a large file but hashes all of it', function () {
+    $code = '<?php '.str_repeat('a', 70000);
+    $base = suspiciousApp(['storage/app/public/big.php' => $code]);
+
+    $file = readScanned(stateAfterScan($base), 'storage/app/public/big.php', $base);
+
+    expect($file['truncated'])->toBeTrue()
+        ->and(strlen(base64_decode($file['content'])))->toBe(SuspiciousFiles::MAX_CONTENT_BYTES)
+        ->and($file['sha256'])->toBe(hash('sha256', $code))
+        ->and($file['size'])->toBe(strlen($code));
+});
+
+it('reads no file the scan did not report', function () {
+    $base = suspiciousApp(['storage/app/public/shell.php' => '<?php', '.env' => 'APP_KEY=secret']);
+
+    expect(readScanned(stateAfterScan($base), '.env', $base))->toBeNull()
+        ->and(readScanned(stateAfterScan($base), 'storage/app/public/other.php', $base))->toBeNull();
+});
+
+it('reads no file that became a link since the scan', function () {
+    $base = suspiciousApp(['storage/app/public/shell.php' => '<?php', '.env' => 'APP_KEY=secret']);
+    $state = stateAfterScan($base);
+    unlink($base.'/storage/app/public/shell.php');
+    symlink($base.'/.env', $base.'/storage/app/public/shell.php');
+
+    expect(readScanned($state, 'storage/app/public/shell.php', $base))->toBeNull();
+});
+
+it('reads no file that was a link already during the scan', function () {
+    $base = suspiciousApp(['.env' => 'APP_KEY=secret', 'storage/app/public/' => '']);
+    symlink($base.'/.env', $base.'/storage/app/public/env.php');
+
+    expect(readScanned(stateAfterScan($base), 'storage/app/public/env.php', $base))->toBeNull();
+});
+
+it('reads no file outside the scanned folders, even when the cache says so', function () {
+    $base = suspiciousApp(['storage/app/public/shell.php' => '<?php', '.env' => 'APP_KEY=secret']);
+    $state = stateAfterScan($base);
+    $state['last']['files'][0]['abs'] = $base.'/.env';
+    $state['last']['files'][0]['size'] = filesize($base.'/.env');
+
+    expect(readScanned($state, 'storage/app/public/shell.php', $base))->toBeNull();
+});
+
+it('reads no file that changed since the scan', function () {
+    $base = suspiciousApp(['storage/app/public/shell.php' => '<?php']);
+    $state = stateAfterScan($base);
+    file_put_contents($base.'/storage/app/public/shell.php', '<?php echo 1;');
+    touch($base.'/storage/app/public/shell.php', 1_790_000_000);
+
+    expect(readScanned($state, 'storage/app/public/shell.php', $base))->toBeNull();
+});
+
+it('reads nothing from a cache written before absolute paths were kept', function () {
+    $base = suspiciousApp(['storage/app/public/shell.php' => '<?php']);
+    $state = stateAfterScan($base);
+    unset($state['last']['files'][0]['abs']);
+
+    expect(readScanned($state, 'storage/app/public/shell.php', $base))->toBeNull();
+});

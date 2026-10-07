@@ -16,6 +16,10 @@ use Illuminate\Contracts\Foundation\Application;
  * never the content. An `index.php` that is empty or only a comment is left
  * out.
  *
+ * With STACKMONITOR_AGENT_FILE_CONTENTS on, the dashboard may ask for the
+ * start of one file of the last complete scan by the hash of its path
+ * (content()); no other file, and none that changed or became a link since.
+ *
  * The scan runs during the report, but within MAX_ENTRIES and MAX_SECONDS: a
  * large folder is looked through over several reports, which send the last
  * complete result meanwhile, kept in the app's cache. A new scan starts once
@@ -46,6 +50,9 @@ final class SuspiciousFiles
     /** The most of an .htaccess file read. */
     private const MAX_HTACCESS = 65536;
 
+    /** The most of a file sent to the dashboard on request. */
+    public const MAX_CONTENT_BYTES = 65536;
+
     public function __construct(
         private readonly Application $app,
         private readonly ?string $basePath = null,
@@ -55,7 +62,7 @@ final class SuspiciousFiles
      * Advances the scan and returns the last complete result, null before
      * the first one.
      *
-     * @return array{scanned_at: string, scanned: int, total: int, files: list<array{path: string, kind: string, size: int, modified_at: string|null}>}|null
+     * @return array{scanned_at: string, scanned: int, total: int, contents: bool, files: list<array{path: string, kind: string, size: int, modified_at: string|null}>}|null
      */
     public function report(): ?array
     {
@@ -71,7 +78,7 @@ final class SuspiciousFiles
 
         $this->cache()->forever(self::CACHE_KEY, $state);
 
-        return self::forReport($state);
+        return self::forReport($state, filter_var(config('stackmonitor-agent.file_contents'), FILTER_VALIDATE_BOOL));
     }
 
     /**
@@ -164,6 +171,8 @@ final class SuspiciousFiles
                         'kind' => $kind,
                         'size' => is_int($size) ? $size : 0,
                         'modified_at' => is_int($modified) ? date(DATE_ATOM, $modified) : null,
+                        // Only for content(): stays in the cache, never in the report.
+                        'abs' => $path,
                     ];
                 }
             }
@@ -182,12 +191,13 @@ final class SuspiciousFiles
 
     /**
      * The report's `suspicious_files` from the cached state; null until a
-     * scan was complete.
+     * scan was complete. `contents` says whether the dashboard may ask for
+     * the start of a file.
      *
      * @param  array<string, mixed>  $state
-     * @return array{scanned_at: string, scanned: int, total: int, files: list<array{path: string, kind: string, size: int, modified_at: string|null}>}|null
+     * @return array{scanned_at: string, scanned: int, total: int, contents: bool, files: list<array{path: string, kind: string, size: int, modified_at: string|null}>}|null
      */
-    public static function forReport(array $state): ?array
+    public static function forReport(array $state, bool $contents = false): ?array
     {
         $last = $state['last'] ?? null;
 
@@ -199,8 +209,97 @@ final class SuspiciousFiles
             'scanned_at' => date(DATE_ATOM, (int) $last['scanned_at']),
             'scanned' => (int) $last['scanned'],
             'total' => (int) $last['total'],
-            'files' => array_values((array) $last['files']),
+            'contents' => $contents,
+            'files' => array_values(array_map(
+                fn (array $file) => array_diff_key($file, ['abs' => true]),
+                (array) $last['files'],
+            )),
         ];
+    }
+
+    /**
+     * The start of a file of the last complete scan, by the hash of its
+     * reported path; null for any other file. Whether the app allows it is
+     * up to the caller.
+     *
+     * @return array{path_hash: string, size: int, sha256: string, truncated: bool, content: string}|null
+     */
+    public function content(string $pathHash): ?array
+    {
+        $state = $this->cache()->get(self::CACHE_KEY);
+
+        return self::read(is_array($state) ? $state : [], $pathHash, $this->roots(), self::MAX_CONTENT_BYTES);
+    }
+
+    /**
+     * Reads at most $maxBytes of the file whose path hashes to $pathHash, if
+     * it is in the last complete scan, still no link, inside one of $roots
+     * and of the size and date the scan saw. The content goes out as base64.
+     *
+     * @param  array<string, mixed>  $state  as cached
+     * @param  list<string>  $roots
+     * @return array{path_hash: string, size: int, sha256: string, truncated: bool, content: string}|null
+     */
+    public static function read(array $state, string $pathHash, array $roots, int $maxBytes): ?array
+    {
+        $file = null;
+
+        foreach ((array) ($state['last']['files'] ?? []) as $candidate) {
+            if (is_array($candidate) && is_string($candidate['path'] ?? null) && hash_equals(hash('sha256', $candidate['path']), $pathHash)) {
+                $file = $candidate;
+                break;
+            }
+        }
+
+        $path = $file['abs'] ?? null;
+
+        if ($file === null || ! is_string($path) || is_link($path) || ! is_file($path) || ! is_readable($path) || ! self::inside($path, $roots)) {
+            return null;
+        }
+
+        clearstatcache(true, $path);
+        $size = @filesize($path);
+        $modified = @filemtime($path);
+
+        if ($size !== ($file['size'] ?? null) || (is_int($modified) ? date(DATE_ATOM, $modified) : null) !== ($file['modified_at'] ?? null)) {
+            return null;
+        }
+
+        $content = @file_get_contents($path, false, null, 0, $maxBytes);
+        $sha256 = @hash_file('sha256', $path);
+
+        if (! is_string($content) || ! is_string($sha256)) {
+            return null;
+        }
+
+        return [
+            'path_hash' => $pathHash,
+            'size' => $size,
+            'sha256' => $sha256,
+            'truncated' => $size > $maxBytes,
+            'content' => base64_encode($content),
+        ];
+    }
+
+    /**
+     * Whether the file, all links resolved, lies inside one of the roots: a
+     * folder swapped for a link since the scan leads elsewhere.
+     *
+     * @param  list<string>  $roots
+     */
+    private static function inside(string $path, array $roots): bool
+    {
+        $real = realpath($path);
+
+        foreach ($roots as $root) {
+            $rootReal = realpath($root);
+
+            if (is_string($real) && is_string($rootReal) && str_starts_with($real, rtrim($rootReal, '/').'/')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

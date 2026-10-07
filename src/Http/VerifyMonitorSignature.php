@@ -28,12 +28,20 @@ final class VerifyMonitorSignature
         $nonce = (string) $request->header('X-Monitor-Nonce', '');
         $signature = (string) $request->header('X-Monitor-Signature', '');
         $maxSkew = (int) config('stackmonitor-agent.max_clock_skew', 300);
+        // A request for the content of one suspicious file signs its path hash along.
+        $file = (string) $request->header('X-Monitor-File', '');
 
         $valid = is_string($secret) && strlen($secret) >= self::MIN_SECRET_LENGTH
             && ctype_digit($timestamp)
             && abs(time() - (int) $timestamp) <= $maxSkew
             && preg_match('/^[a-f0-9]{32}$/', $nonce) === 1
-            && hash_equals(Signature::forRequest($timestamp, $nonce, $secret), $signature);
+            && ($file === '' || preg_match('/^[a-f0-9]{64}$/', $file) === 1)
+            && hash_equals(
+                $file === ''
+                    ? Signature::forRequest($timestamp, $nonce, $secret)
+                    : Signature::forFileRequest($timestamp, $nonce, $file, $secret),
+                $signature,
+            );
 
         if (! $valid || ! Cache::add('stackmonitor-agent:nonce:'.$nonce, true, $maxSkew * 2 + 1)) {
             // Deliberately the exact exception (and message) Laravel's router throws for an

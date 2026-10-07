@@ -5,6 +5,17 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.12.0] - 2026-10-07
+
+### Added
+
+- Lets the dashboard read the start of a suspicious file (at most 64 KB),
+  to look for signs of malicious code. Off unless
+  `STACKMONITOR_AGENT_FILE_CONTENTS=true` is set in the app's `.env`. Only
+  files of the agent's own last scan can be read, by the hash of their path;
+  no other file, none that changed since the scan and none that is a link.
+  The report says in `suspicious_files.contents` whether it is on.
+
 ## [1.11.0] - 2026-10-04
 
 ### Added

@@ -88,6 +88,13 @@ Kommentaren besteht, lässt er aus; verlinkten Ordnern folgt er nicht. Der Scan 
 höchstens 50.000 Einträge und 2 Sekunden; große Ordner werden so über mehrere Reports durchsucht, den Stand hält
 der Standard-Cache der App. Ein neuer Scan beginnt, wenn das letzte Ergebnis 30 Minuten alt ist.
 
+Ab 1.12.0 darf das Dashboard den Anfang (höchstens 64 KB) einer verdächtigen Datei lesen, die der Agent selbst
+gefunden hat, und prüft ihn auf Merkmale von Schadcode. Das ist aus, bis die App es mit
+`STACKMONITOR_AGENT_FILE_CONTENTS=true` in der `.env` erlaubt; das Dashboard kann es nicht einschalten. Lesbar
+sind nur Dateien aus dem letzten vollständigen Scan des Agenten, angefragt über den SHA-256 ihres Pfads: keine
+andere Datei, keine, die sich seit dem Scan geändert hat, und keine, die ein Link ist. Ob es erlaubt ist, steht
+im Report unter `suspicious_files.contents`. Die Anfrage ist wie jede andere signiert, der Pfad-Hash mit.
+
 ## Deploys
 
 Ab 1.10.0 meldet er den letzten Deploy, damit das Dashboard ihn in seinen Diagrammen markiert. Er sieht nacheinander
