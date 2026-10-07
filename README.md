@@ -53,6 +53,9 @@ Kommandozeile (Cron, Queue-Worker) können abweichen. Weil Laravel `display_erro
 meldet er dafür den Wert aus der PHP-Konfiguration: Er greift, wenn ein Fehler vor dem Start passiert.
 Ist `opcache_get_status()` per `opcache.restrict_api` gesperrt, bleibt der Füllstand unbekannt.
 
+Ab 1.14.0 meldet er die Uhrzeit des Servers, als letzten Wert vor dem Senden, und die Zeitzone der App
+(`app.timezone`). Das Dashboard erkennt daran eine falsch gehende Serveruhr.
+
 ## Geplante Aufgaben
 
 Ab 1.7.0 meldet er jede geplante Aufgabe des Schedulers einzeln: Befehl bzw. Beschreibung, Cron-Ausdruck,

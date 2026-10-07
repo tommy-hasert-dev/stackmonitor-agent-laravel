@@ -54,3 +54,14 @@ it('reports the errors of the configured log, without messages when switched off
         ->and($log['errors'])->toBe(1)
         ->and($log['top'])->toBeNull();
 });
+
+it('reports the server clock and the app time zone last (#157)', function () {
+    config(['app.timezone' => 'Europe/Berlin']);
+    $before = microtime(true);
+
+    $report = app(ReportBuilder::class)->build();
+
+    expect($report['extra']->clock['timezone'])->toBe('Europe/Berlin')
+        ->and($report['extra']->clock['time'])->toBeFloat()->toBeGreaterThanOrEqual($before)->toBeLessThanOrEqual(microtime(true))
+        ->and(array_key_last((array) $report['extra']))->toBe('clock');
+});

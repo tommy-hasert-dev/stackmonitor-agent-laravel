@@ -7,7 +7,7 @@ use StackMonitor\Agent\ErrorLog\ErrorLog;
 
 final class ReportBuilder
 {
-    public const AGENT_VERSION = '1.13.0';
+    public const AGENT_VERSION = '1.14.0';
 
     /** What composer.lock records for a package installed from packagist.org. */
     private const PACKAGIST_NOTIFICATION_URL = 'https://packagist.org/downloads/';
@@ -22,7 +22,7 @@ final class ReportBuilder
      */
     public function build(): array
     {
-        return [
+        $report = [
             'schema_version' => 1,
             'agent_version' => self::AGENT_VERSION,
             'platform' => 'laravel',
@@ -35,6 +35,26 @@ final class ReportBuilder
             'extra' => (object) $this->app->make(OperationalData::class)->report(),
             'error_log' => $this->errorLog(),
             ...$this->npm(),
+        ];
+        // Taken last, right before the answer goes out, so the dashboard can
+        // tell a server clock that is off (#157) from a slow report.
+        $report['extra']->clock = $this->clock();
+
+        return $report;
+    }
+
+    /**
+     * The server's clock and the app's time zone (#157).
+     *
+     * @return array{time: float, timezone: string|null}
+     */
+    private function clock(): array
+    {
+        $timezone = config('app.timezone');
+
+        return [
+            'time' => microtime(true),
+            'timezone' => is_string($timezone) && $timezone !== '' ? $timezone : null,
         ];
     }
 

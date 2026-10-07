@@ -5,6 +5,16 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.14.0] - 2026-10-07
+
+### Added
+
+- Reports the server's clock and the app's time zone in `extra.clock`: the
+  time as Unix seconds with microseconds, taken last before the answer goes
+  out, and `app.timezone`. The dashboard tells from it whether the server's
+  clock is off. Needs a dashboard that knows the field, so the dashboard is
+  deployed first.
+
 ## [1.13.0] - 2026-10-07
 
 ### Added
