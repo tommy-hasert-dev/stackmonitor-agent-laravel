@@ -5,6 +5,16 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.13.0] - 2026-10-07
+
+### Added
+
+- Each of the most frequent messages of the error log names where its
+  exception was raised in `error_log.top[].source`: the Composer package below
+  `vendor/`, the framework as `core`, or the app's own code, read from the
+  context before it is dropped. Needs a dashboard that knows the field, so the
+  dashboard is deployed first.
+
 ## [1.12.0] - 2026-10-07
 
 ### Added

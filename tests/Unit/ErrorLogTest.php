@@ -50,10 +50,32 @@ it('counts errors of the last 24 hours in a single file and names the most frequ
         'warnings' => null,
         'truncated' => false,
         'top' => [
-            ['message' => 'Mail to <email> failed', 'level' => 'error', 'count' => 2],
-            ['message' => 'Undefined array key N', 'level' => 'error', 'count' => 1],
+            ['message' => 'Mail to <email> failed', 'level' => 'error', 'source' => ['type' => 'app', 'name' => null], 'count' => 2],
+            ['message' => 'Undefined array key N', 'level' => 'error', 'source' => null, 'count' => 1],
         ],
     ]);
+});
+
+it('names the package or part of the app an exception was raised in', function (string $message, ?array $source) {
+    expect(errorLog([])->source($message))->toBe($source);
+})->with([
+    'package' => ['Card declined {"exception":"[object] (Acme\\\\Pay\\\\Declined(code: 0): Card declined at /var/www/vendor/Acme/pay-sdk/src/Client.php:12)"}', ['type' => 'composer', 'name' => 'acme/pay-sdk']],
+    'framework' => ['SQLSTATE[42S02] {"exception":"[object] (Illuminate\\\\Database\\\\QueryException(code: 42S02): SQLSTATE[42S02]: Base table not found (Connection: mysql, SQL: select * from x) at /var/www/vendor/laravel/framework/src/Illuminate/Database/Connection.php:825)"}', ['type' => 'core', 'name' => null]],
+    'app' => ['Boom {"exception":"[object] (RuntimeException(code: 0): Boom at /var/www/app/Jobs/Sync.php:40)"}', ['type' => 'app', 'name' => null]],
+    'no exception' => ['Payment failed {"order":12}', null],
+    'path in the message only' => ['file_put_contents(/var/www/vendor/a/b/x): Failed to open stream', null],
+]);
+
+it('takes the source from the newest entry that has one', function () {
+    file_put_contents($this->dir.'/laravel.log',
+        logLine(300, 'ERROR', 'Boom {"exception":"[object] (RuntimeException(code: 0): Boom at /var/www/vendor/acme/a/src/A.php:1)"}')
+        .logLine(200, 'ERROR', 'Boom {"exception":"[object] (RuntimeException(code: 0): Boom at /var/www/vendor/acme/b/src/B.php:1)"}')
+        .logLine(100, 'ERROR', 'Boom'),
+    );
+
+    $report = errorLog(['single' => ['driver' => 'single', 'path' => $this->dir.'/laravel.log']], 'single')->report(LOG_NOW);
+
+    expect($report['top'])->toBe([['message' => 'Boom', 'level' => 'error', 'source' => ['type' => 'composer', 'name' => 'acme/b'], 'count' => 3]]);
 });
 
 it('reads today\'s and yesterday\'s file of a daily channel', function () {
@@ -186,7 +208,10 @@ it('reads timestamps in the app timezone or with their own offset', function () 
 });
 
 it('matches the shared schema', function () {
-    file_put_contents($this->dir.'/laravel.log', logLine(100, 'ERROR', 'Boom'));
+    file_put_contents($this->dir.'/laravel.log',
+        logLine(200, 'ERROR', 'Boom')
+        .logLine(100, 'ERROR', 'Card declined {"exception":"[object] (E(code: 0): Card declined at /var/www/vendor/acme/pay/src/C.php:1)"}'),
+    );
     $report = errorLog(['single' => ['driver' => 'single', 'path' => $this->dir.'/laravel.log']], 'single')->report(LOG_NOW);
 
     $schema = json_decode(file_get_contents(__DIR__.'/../../../../schema/agent-report.v1.json'));

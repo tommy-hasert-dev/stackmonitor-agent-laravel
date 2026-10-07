@@ -14,9 +14,11 @@ use Throwable;
  * default channel if it is `single` or `daily`, or the first such channel in
  * a stack; anything else (stderr, Sentry, Papertrail, …) is reported as not
  * evaluable. The log is read from its end, at most READ_LIMIT bytes, so a
- * big log doesn't slow the report down.
+ * big log doesn't slow the report down. Each message names the package or
+ * the part of the app it was raised in, if the log says (see source()).
  *
- * @phpstan-type Report array{status: string, reason: string|null, source: string|null, errors: int|null, warnings: null, truncated: bool, top: list<array{message: string, level: string, count: int}>|null}
+ * @phpstan-type Source array{type: string, name: string|null}
+ * @phpstan-type Report array{status: string, reason: string|null, source: string|null, errors: int|null, warnings: null, truncated: bool, top: list<array{message: string, level: string, source: Source|null, count: int}>|null}
  */
 final class ErrorLog
 {
@@ -31,6 +33,9 @@ final class ErrorLog
 
     /** Different messages kept for the top list; more are only counted. */
     public const MAX_DISTINCT = 500;
+
+    /** Longer package names are left out. */
+    public const MAX_SOURCE = 200;
 
     private const LEVELS = ['ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY'];
 
@@ -141,6 +146,7 @@ final class ErrorLog
 
         $budget = self::READ_LIMIT;
         $counts = [];
+        $sources = [];
         $errors = 0;
         $truncated = false;
         $timezone = new DateTimeZone($this->timezone);
@@ -163,7 +169,7 @@ final class ErrorLog
                 }
 
                 if ((new DateTimeImmutable($match[1], $timezone))->getTimestamp() < $since) {
-                    return $this->result($source, $errors, false, $counts);
+                    return $this->result($source, $errors, false, $counts, $sources);
                 }
 
                 if (in_array($match[2], self::LEVELS, true)) {
@@ -172,6 +178,8 @@ final class ErrorLog
 
                     if (isset($counts[$message]) || count($counts) < self::MAX_DISTINCT) {
                         $counts[$message] = ($counts[$message] ?? 0) + 1;
+                        // The newest entry that says where it was raised.
+                        $sources[$message] ??= $this->source($match[3]);
                     }
                 }
             }
@@ -182,7 +190,7 @@ final class ErrorLog
             }
         }
 
-        return $this->result($source, $errors, $truncated, $counts);
+        return $this->result($source, $errors, $truncated, $counts, $sources);
     }
 
     /**
@@ -230,6 +238,36 @@ final class ErrorLog
     }
 
     /**
+     * Where an exception in the context was raised, from the path Laravel
+     * writes after it (`… at /var/www/vendor/acme/pay/src/Client.php:12)`)
+     * before the context is dropped: a Composer package below vendor/, the
+     * framework itself as core, any other file as the app's own code. Null
+     * for an entry without exception.
+     *
+     * @return Source|null
+     */
+    public function source(string $message): ?array
+    {
+        $message = mb_substr($message, 0, LogMessage::MAX_INPUT * 4, 'UTF-8');
+
+        if (preg_match('#\(code: [^)]*\): .* at ((?:[A-Za-z]:)?[\\\\/][^\s]*?):\d+\)#', $message, $match) !== 1) {
+            return null;
+        }
+
+        if (preg_match('#[\\\\/]vendor[\\\\/]([\w.\-]+)[\\\\/]([\w.\-]+)[\\\\/]#', $match[1], $package) !== 1) {
+            return ['type' => 'app', 'name' => null];
+        }
+
+        $name = strtolower($package[1].'/'.$package[2]);
+
+        return match (true) {
+            $name === 'laravel/framework' => ['type' => 'core', 'name' => null],
+            strlen($name) > self::MAX_SOURCE => null,
+            default => ['type' => 'composer', 'name' => $name],
+        };
+    }
+
+    /**
      * Monolog appends the context and extra data as JSON; they may hold
      * request data and the exception with its paths, so they stay behind.
      */
@@ -240,9 +278,10 @@ final class ErrorLog
 
     /**
      * @param  array<string, int>  $counts
+     * @param  array<string, Source|null>  $sources
      * @return Report
      */
-    private function result(string $source, int $errors, bool $truncated, array $counts): array
+    private function result(string $source, int $errors, bool $truncated, array $counts, array $sources): array
     {
         $top = null;
 
@@ -251,7 +290,7 @@ final class ErrorLog
             $top = [];
 
             foreach (array_slice($counts, 0, self::TOP, true) as $message => $count) {
-                $top[] = ['message' => (string) $message, 'level' => 'error', 'count' => $count];
+                $top[] = ['message' => (string) $message, 'level' => 'error', 'source' => $sources[$message] ?? null, 'count' => $count];
             }
         }
 

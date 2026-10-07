@@ -29,7 +29,8 @@ letzten 5 MB. Andere Kanäle (stderr, Sentry, Papertrail …) meldet er als „n
 
 Mitgeschickt werden die drei häufigsten Meldungen, nur die erste Zeile ohne Kontext und Stacktrace, auf 200
 Zeichen gekürzt. E-Mail-Adressen, URLs, Werte in Anführungszeichen, IDs, Tokens, IP-Adressen, Zahlen, SQL und
-Verzeichnisse ersetzt er vorher. Mit `STACKMONITOR_AGENT_LOG_MESSAGES=false` in der `.env` gehen nur die
+Verzeichnisse ersetzt er vorher. Ab 1.13.0 nennt er zu jeder Meldung, wo die Exception geworfen wurde: das
+Composer-Paket unter `vendor/`, das Framework oder den Code der App. Mit `STACKMONITOR_AGENT_LOG_MESSAGES=false` in der `.env` gehen nur die
 Anzahlen raus.
 
 ## Betriebsdaten
