@@ -3,165 +3,165 @@
   <img src="art/stackmonitor-logo-on-light.svg" alt="StackMonitor" height="48">
 </picture>
 
-# StackMonitor Agent für Laravel
+# StackMonitor Agent for Laravel
 
-Nur lesender Agent. Er liefert dem StackMonitor-Dashboard Laravel-, PHP- und Paketversionen, die Fehler
-der letzten 24 Stunden aus dem Log und Betriebsdaten, die nur der Server sieht.
-Unterstützt Laravel 10–13 und PHP ≥ 8.1.
+Read-only agent. It gives the StackMonitor dashboard the Laravel, PHP and package versions, the errors of the
+last 24 hours from the log and operational data that only the server can see.
+Supports Laravel 10–13 and PHP ≥ 8.1.
 
 ## Installation
 
 1. `composer require stackmonitor/agent-laravel`
-2. Im StackMonitor-Dashboard die Site öffnen, dann **Bearbeiten → Agent → Secret erzeugen**.
-3. Die angezeigte Zeile in die `.env` der Site eintragen:
+2. In the StackMonitor dashboard, open the site, then **Bearbeiten → Agent → Secret erzeugen** (Edit → Agent →
+   Generate secret).
+3. Add the line shown there to the site's `.env`:
    `STACKMONITOR_AGENT_SECRET=…`
-4. `php artisan config:cache` ausführen, falls die Config gecacht wird. Wird die `.env` später erneut geändert
-   (z. B. neues Secret, anderer Pfad), müssen `php artisan config:cache` und, falls Routen gecacht sind,
-   `php artisan route:cache` erneut ausgeführt werden — sonst greift weiterhin die alte, gecachte Konfiguration.
+4. Run `php artisan config:cache` if the config is cached. If the `.env` changes again later (e.g. a new
+   secret, a different path), run `php artisan config:cache` again and, if routes are cached,
+   `php artisan route:cache` — otherwise the old, cached configuration stays in effect.
 
-Der Endpunkt ist `GET /stackmonitor/status`. Der Pfad lässt sich mit `STACKMONITOR_AGENT_PATH` ändern, dann muss die Agent-URL im Dashboard angepasst werden.
+The endpoint is `GET /stackmonitor/status`. The path can be changed with `STACKMONITOR_AGENT_PATH`; the agent URL in the dashboard then has to be changed to match.
 
-## Fehler im Log
+## Errors in the log
 
-Der Agent zählt die Einträge ab Level `error` der letzten 24 Stunden im Datei-Log der App: im Default-Kanal,
-wenn er `single` oder `daily` ist, sonst im ersten solchen Kanal eines Stacks. Gelesen werden höchstens die
-letzten 5 MB. Andere Kanäle (stderr, Sentry, Papertrail …) meldet er als „nicht auswertbar“.
+The agent counts the entries of level `error` and above from the last 24 hours in the app's file log: in the
+default channel if it is `single` or `daily`, otherwise in the first such channel of a stack. It reads at most
+the last 5 MB. Other channels (stderr, Sentry, Papertrail …) it reports as "not readable".
 
-Mitgeschickt werden die drei häufigsten Meldungen, nur die erste Zeile ohne Kontext und Stacktrace, auf 200
-Zeichen gekürzt. E-Mail-Adressen, URLs, Werte in Anführungszeichen, IDs, Tokens, IP-Adressen, Zahlen, SQL und
-Verzeichnisse ersetzt er vorher. Ab 1.13.0 nennt er zu jeder Meldung, wo die Exception geworfen wurde: das
-Composer-Paket unter `vendor/`, das Framework oder den Code der App. Mit `STACKMONITOR_AGENT_LOG_MESSAGES=false` in der `.env` gehen nur die
-Anzahlen raus.
+It sends along the three most frequent messages, only the first line without context and stack trace, cut to
+200 characters. Email addresses, URLs, quoted values, IDs, tokens, IP addresses, numbers, SQL and directories
+are replaced first. Since 1.13.0 it names for each message where the exception was thrown: the Composer
+package under `vendor/`, the framework or the app's own code. With `STACKMONITOR_AGENT_LOG_MESSAGES=false` in
+the `.env` only the counts are sent.
 
-## Betriebsdaten
+## Operational data
 
-Ab 1.3.0 meldet der Agent zusätzlich: fehlgeschlagene Jobs, wartende Jobs der Standard-Queue (nicht beim
-Treiber `sync`; erst ab Laravel-Versionen mit `pendingSize()`, sonst „unbekannt“), wann der Scheduler zuletzt lief, freien Speicherplatz, noch nicht gelaufene Migrationen und ob
-Config und Routen gecacht sind. Für den Scheduler merkt er sich jeden Start von `schedule:run` im Standard-Cache
-der App; bis zum ersten Lauf nach der Installation meldet er „noch kein Lauf“. Was er nicht lesen kann, meldet er
-als unbekannt.
+Since 1.3.0 the agent also reports: failed jobs, pending jobs of the default queue (not with the `sync`
+driver; only on Laravel versions with `pendingSize()`, otherwise "unknown"), when the scheduler last ran, free
+disk space, migrations not yet run and whether config and routes are cached. For the scheduler it records each
+start of `schedule:run` in the app's default cache; until the first run after installation it reports "no run
+yet". Whatever it cannot read it reports as unknown.
 
-Ab 1.4.0 meldet er außerdem die letzte Sicherung von `spatie/laravel-backup`, falls die App es nutzt: die neueste
-Backup-Datei auf den konfigurierten Disks mit dem Treiber `local`. Entfernte Disks (S3, FTP …) fragt er nicht ab,
-das kostete bei jedem Bericht einen Netzwerkzugriff; sichert die App nur dorthin, meldet er den Zeitpunkt als
-unbekannt.
+Since 1.4.0 it also reports the last backup of `spatie/laravel-backup` if the app uses it: the newest backup
+file on the configured disks with the `local` driver. It does not query remote disks (S3, FTP …), as that would
+cost a network request on every report; if the app only backs up there, it reports the time as unknown.
 
-Ab 1.5.0 meldet er die PHP-Einstellungen des Webservers: SAPI, OPcache mit Füllstand, `memory_limit`,
+Since 1.5.0 it reports the web server's PHP settings: SAPI, OPcache with fill level, `memory_limit`,
 `max_execution_time`, `upload_max_filesize`, `post_max_size`, `display_errors`, `error_reporting`,
-`date.timezone` und die Namen der geladenen Erweiterungen. Das Dashboard fragt per HTTP, die Werte der
-Kommandozeile (Cron, Queue-Worker) können abweichen. Weil Laravel `display_errors` beim Start abschaltet,
-meldet er dafür den Wert aus der PHP-Konfiguration: Er greift, wenn ein Fehler vor dem Start passiert.
-Ist `opcache_get_status()` per `opcache.restrict_api` gesperrt, bleibt der Füllstand unbekannt.
+`date.timezone` and the names of the loaded extensions. The dashboard asks over HTTP; the command-line values
+(cron, queue workers) may differ. Because Laravel turns `display_errors` off at boot, it reports the value from
+the PHP configuration for it instead: that is what applies when an error happens before boot.
+If `opcache_get_status()` is blocked by `opcache.restrict_api`, the fill level stays unknown.
 
-Ab 1.14.0 meldet er die Uhrzeit des Servers, als letzten Wert vor dem Senden, und die Zeitzone der App
-(`app.timezone`). Das Dashboard erkennt daran eine falsch gehende Serveruhr.
+Since 1.14.0 it reports the server's time, as the last value before sending, and the app's time zone
+(`app.timezone`). From this the dashboard detects a server clock that is off.
 
-## Geplante Aufgaben
+## Scheduled tasks
 
-Ab 1.7.0 meldet er jede geplante Aufgabe des Schedulers einzeln: Befehl bzw. Beschreibung, Cron-Ausdruck,
-Zeitzone und den letzten Lauf mit Start, Ende, Ergebnis, Exit-Code, kurzer Fehlermeldung und den Dauern der
-letzten 10 erfolgreichen Läufe. Er hört dafür auf die Ereignisse des Schedulers und merkt sich die Läufe im
-Standard-Cache der App; bei Aufgaben mit `runInBackground()` zählt das Ende über `schedule:finish`. Eine Aufgabe
-erkennt er am Befehl mit Argumenten (eine Closure an ihrer Beschreibung), nicht am Zeitplan. Läuft die App auf
-mehreren Servern, muss der Cache geteilt sein (Redis, Datenbank), sonst sieht jeder Agent nur die Läufe seines
-Servers – `onOneServer()` verlangt das ohnehin.
+Since 1.7.0 it reports every scheduled task of the scheduler individually: command or description, cron
+expression, time zone and the last run with start, end, result, exit code, a short error message and the
+durations of the last 10 successful runs. To do this it listens to the scheduler's events and records the runs
+in the app's default cache; for tasks with `runInBackground()` the end is taken from `schedule:finish`. It
+identifies a task by its command with arguments (a closure by its description), not by its schedule. If the
+app runs on several servers, the cache has to be shared (Redis, database), otherwise each agent only sees the
+runs on its own server – `onOneServer()` requires that anyway.
 
-Die Liste der Aufgaben stammt ab 1.7.1 aus dem letzten `schedule:run`, nicht aus dem Request: Steht der Schedule
-in `routes/console.php` (Standard seit Laravel 11), lädt nur die Konsole ihn. Bis zum ersten Lauf des Schedulers
-nach der Installation fehlt die Liste deshalb.
+Since 1.7.1 the list of tasks comes from the last `schedule:run`, not from the request: if the schedule is
+defined in `routes/console.php` (the default since Laravel 11), only the console loads it. Until the
+scheduler's first run after installation the list is therefore missing.
 
-## Fehlgeschlagene Logins
+## Failed logins
 
-Ab 1.8.0 zählt er die fehlgeschlagenen Logins pro Stunde, damit das Dashboard den Verlauf zeigt und Ausreißer
-markiert: wie viele fehlschlugen, wie viele davon für einen existierenden Benutzer (falsches Passwort) und von wie
-vielen verschiedenen Adressen. Er hört dafür auf die Ereignisse `Attempting` und `Failed` von Laravels Auth und
-merkt sich die Zahlen der letzten 14 Tage im Standard-Cache der App. Die App verlassen nur Zahlen, keine Adressen
-und keine Benutzernamen; Adressen unterscheidet er innerhalb der Stunde an einem kurzen, mit `APP_KEY`
-gebildeten Hash (höchstens 1000 pro Stunde), für vergangene Stunden bleibt nur ihre Anzahl. Bis die App
-jemanden über Laravels Auth anmelden lässt (Breeze, Jetstream/Fortify, `Auth::attempt()`), fehlt der Teil;
-Token-Guards wie der von Sanctum lösen diese Ereignisse nicht aus.
+Since 1.8.0 it counts failed logins per hour, so the dashboard can show the trend and flag outliers: how many
+failed, how many of those were for an existing user (wrong password) and from how many different addresses. To
+do this it listens to the `Attempting` and `Failed` events of Laravel's auth and keeps the numbers of the last
+14 days in the app's default cache. Only numbers leave the app, no addresses and no user names; within the hour
+it tells addresses apart by a short hash built with `APP_KEY` (at most 1000 per hour), for past hours only
+their count remains. As long as the app doesn't log anyone in through Laravel's auth (Breeze,
+Jetstream/Fortify, `Auth::attempt()`), this part is missing; token guards such as Sanctum's don't fire these
+events.
 
-## Verdächtige Dateien
+## Suspicious files
 
-Ab 1.9.0 durchsucht er den Ordner der `public`-Disk (`storage/app/public`) mit allen Unterordnern und
-`public/storage`, wenn das ein eigener Ordner statt des üblichen Links ist, nach Dateien, die PHP ausführen
-können: PHP-Endungen (`.php`, `.phtml`, `.phar`, `.pht`, `.php3` bis `.php8`, `.phps`), eine PHP-Endung vor der
-letzten (`bild.php.jpg`) und `.htaccess`-Dateien, die Dateien an PHP geben oder `php_flag engine on` setzen. Die App
-verlassen nur Pfad, Größe und Änderungsdatum, nie der Inhalt. Eine `index.php`, die leer ist oder nur aus
-Kommentaren besteht, lässt er aus; verlinkten Ordnern folgt er nicht. Der Scan läuft beim Report, je Report aber
-höchstens 50.000 Einträge und 2 Sekunden; große Ordner werden so über mehrere Reports durchsucht, den Stand hält
-der Standard-Cache der App. Ein neuer Scan beginnt, wenn das letzte Ergebnis 30 Minuten alt ist.
+Since 1.9.0 it searches the folder of the `public` disk (`storage/app/public`) with all subfolders, and
+`public/storage` if that is a folder of its own instead of the usual link, for files that can execute PHP: PHP
+extensions (`.php`, `.phtml`, `.phar`, `.pht`, `.php3` to `.php8`, `.phps`), a PHP extension before the last
+one (`image.php.jpg`) and `.htaccess` files that hand files to PHP or set `php_flag engine on`. Only path, size
+and modification date leave the app, never the contents. It skips an `index.php` that is empty or consists only
+of comments; it doesn't follow linked folders. The scan runs during the report, but per report for at most
+50,000 entries and 2 seconds; large folders are thus searched over several reports, with the progress kept in
+the app's default cache. A new scan starts once the last result is 30 minutes old.
 
-Ab 1.12.0 darf das Dashboard den Anfang (höchstens 64 KB) einer verdächtigen Datei lesen, die der Agent selbst
-gefunden hat, und prüft ihn auf Merkmale von Schadcode. Das ist aus, bis die App es mit
-`STACKMONITOR_AGENT_FILE_CONTENTS=true` in der `.env` erlaubt; das Dashboard kann es nicht einschalten. Lesbar
-sind nur Dateien aus dem letzten vollständigen Scan des Agenten, angefragt über den SHA-256 ihres Pfads: keine
-andere Datei, keine, die sich seit dem Scan geändert hat, und keine, die ein Link ist. Ob es erlaubt ist, steht
-im Report unter `suspicious_files.contents`. Die Anfrage ist wie jede andere signiert, der Pfad-Hash mit.
+Since 1.12.0 the dashboard may read the beginning (at most 64 KB) of a suspicious file the agent found itself,
+and checks it for signs of malicious code. This is off until the app allows it with
+`STACKMONITOR_AGENT_FILE_CONTENTS=true` in the `.env`; the dashboard cannot turn it on. Only files from the
+agent's last complete scan can be read, requested by the SHA-256 of their path: no other file, none that has
+changed since the scan, and none that is a link. Whether it is allowed is stated in the report under
+`suspicious_files.contents`. The request is signed like any other, including the path hash.
 
 ## Deploys
 
-Ab 1.10.0 meldet er den letzten Deploy, damit das Dashboard ihn in seinen Diagrammen markiert. Er sieht nacheinander
-nach:
+Since 1.10.0 it reports the last deploy, so the dashboard can mark it in its charts. It checks, in this order:
 
-1. **Deploy-Datei:** `.stackmonitor-deploy` im Projektordner (anderer Pfad über `STACKMONITOR_AGENT_DEPLOY_FILE`,
-   relativ zum Projekt oder absolut). Ihre Änderungszeit ist der Deploy, ihre erste Zeile, wenn vorhanden, die
-   Revision (höchstens 40 Zeichen). Das passt auch für Deploys ohne Git auf dem Server, etwa per rsync. Im
-   Deploy-Skript reicht nach dem Kopieren der Dateien z. B. `git rev-parse HEAD > .stackmonitor-deploy` (lokal
-   ausgeführt und mitkopiert) oder `touch .stackmonitor-deploy` auf dem Server.
-2. **Git:** der Commit, auf den `HEAD` zeigt, mit der Zeit, zu der der Branch dorthin gewandert ist.
-3. **Config-Cache:** wann `php artisan config:cache` zuletzt lief (`bootstrap/cache/config.php`), ohne Revision.
+1. **Deploy file:** `.stackmonitor-deploy` in the project folder (a different path via
+   `STACKMONITOR_AGENT_DEPLOY_FILE`, relative to the project or absolute). Its modification time is the deploy,
+   its first line, if present, the revision (at most 40 characters). This also works for deploys without Git on
+   the server, e.g. via rsync. In the deploy script, after copying the files, e.g.
+   `git rev-parse HEAD > .stackmonitor-deploy` (run locally and copied along) or `touch .stackmonitor-deploy`
+   on the server is enough.
+2. **Git:** the commit `HEAD` points to, with the time the branch moved there.
+3. **Config cache:** when `php artisan config:cache` last ran (`bootstrap/cache/config.php`), without a revision.
 
-Ist nichts davon da, meldet er keinen Deploy.
+If none of these is present, it reports no deploy.
 
-## Datenbankgröße
+## Database size
 
-Ab 1.11.0 meldet er die Größe der Datenbank der Standard-Verbindung, damit das Dashboard das Wachstum zeigt, bevor
-das Limit des Hosters erreicht ist: die Gesamtgröße (Daten und Indizes aller Tabellen), die Zahl der Tabellen und die
-10 größten mit Größe und ungefährer Zeilenzahl, nie ihren Inhalt. MySQL und MariaDB liest er aus
-`information_schema`, sperrt der Hoster das, mit `SHOW TABLE STATUS`; Views zählen nicht mit. Bei SQLite zählt die
-Größe der Datei, die Tabellen liest er aus `dbstat`, wenn SQLite damit gebaut ist; eine Zeilenzahl schätzt SQLite
-nicht. Gemessen wird etwa einmal am Tag (alle 23 Stunden, damit bei stündlichen Reports kein Tag ausfällt), das
-Ergebnis hält der Standard-Cache der App; schlägt die Messung fehl, versucht er es nach einer Stunde wieder. Für
-andere Treiber (PostgreSQL, SQL Server) und eine Datenbank im Speicher fehlt der Wert.
+Since 1.11.0 it reports the size of the default connection's database, so the dashboard shows the growth before
+the host's limit is reached: the total size (data and indexes of all tables), the number of tables and the 10
+largest with size and approximate row count, never their contents. MySQL and MariaDB it reads from
+`information_schema`, or with `SHOW TABLE STATUS` if the host blocks that; views don't count. With SQLite the
+size of the file counts, and it reads the tables from `dbstat` if SQLite was built with it; SQLite doesn't
+estimate a row count. It measures about once a day (every 23 hours, so no day is skipped with hourly reports),
+with the result kept in the app's default cache; if the measurement fails, it tries again after an hour. For
+other drivers (PostgreSQL, SQL Server) and an in-memory database the value is missing.
 
-## npm-Pakete
+## npm packages
 
-Ab 1.6.0 meldet er die JavaScript-Pakete der App, damit das Dashboard sie auf Sicherheitslücken prüfen kann.
-Er liest dafür nur das Lockfile neben der `package.json`: `package-lock.json` (Version 1 bis 3),
-`pnpm-lock.yaml` oder `yarn.lock`, in dieser Reihenfolge. Gemeldet werden alle installierten Pakete, auch
-transitive, mit Version und ob sie nur für die Entwicklung gebraucht werden (höchstens 5000). `yarn.lock` und
-pnpm ab Lockfile-Version 9 vermerken das nicht; dort gelten nur die direkten `devDependencies` aus der
-`package.json` als Entwicklungs-Abhängigkeit. Liegt kein Lockfile auf dem Server, etwa weil die Assets in der
-CI gebaut werden, meldet er das; ohne `package.json` entfällt der Teil.
+Since 1.6.0 it reports the app's JavaScript packages, so the dashboard can check them for vulnerabilities.
+For this it only reads the lockfile next to `package.json`: `package-lock.json` (versions 1 to 3),
+`pnpm-lock.yaml` or `yarn.lock`, in that order. It reports all installed packages, transitive ones included,
+with version and whether they are only needed for development (at most 5000). `yarn.lock` and pnpm from
+lockfile version 9 don't record that; there only the direct `devDependencies` from `package.json` count as
+development dependencies. If there is no lockfile on the server, e.g. because the assets are built in CI, it
+reports that; without a `package.json` this part is left out.
 
-## Sicherheit
+## Security
 
-- Jede Anfrage muss per HMAC-SHA256 signiert sein. Timestamp (±300 s) und Nonce werden geprüft, eine Nonce ist nur einmal gültig.
-- Ungültige Anfragen beantwortet der Endpunkt mit `404` — demselben generischen 404, das Laravel auch für unbekannte Routen liefert, bei jeder HTTP-Methode, damit der Endpunkt nach außen nicht auffällt. Die Antwort auf eine gültige Anfrage ist ebenfalls signiert.
-- Bekannte Einschränkung: Mit `APP_DEBUG=true` zeigt die Fehlerseite einer abgelehnten Anfrage den Stacktrace
-  und darin den Agent. In Produktion gehört `APP_DEBUG` ohnehin auf `false`, sonst liegt die ganze Anwendung offen.
-- Der Agent ist nur lesend: keine schreibenden Aktionen, keine Session, keine Cookies.
-- Für den Replay-Schutz nutzt er den Standard-Cache der Anwendung (`cache.default`). Dieser Cache muss
-  **persistent und, bei mehreren Anwendungs-Knoten, geteilt** sein (z. B. Redis oder der Datenbank-Treiber) —
-  die Treiber `array` und `null` schützen nicht vor Replays: `array` vergisst genutzte Nonces beim nächsten
-  Request-Prozess, `null` speichert gar nichts, und bei mehreren Knoten ohne geteilten Cache sieht jeder Knoten
-  nur seine eigenen bereits genutzten Nonces.
+- Every request has to be signed with HMAC-SHA256. Timestamp (±300 s) and nonce are checked; a nonce is only valid once.
+- The endpoint answers invalid requests with `404` — the same generic 404 that Laravel returns for unknown routes, for every HTTP method, so the endpoint doesn't stand out from the outside. The response to a valid request is signed as well.
+- Known limitation: with `APP_DEBUG=true`, the error page of a rejected request shows the stack trace and the
+  agent in it. In production `APP_DEBUG` belongs on `false` anyway, otherwise the whole application is exposed.
+- The agent is read-only: no write actions, no session, no cookies.
+- For replay protection it uses the application's default cache (`cache.default`). This cache has to be
+  **persistent and, with several application nodes, shared** (e.g. Redis or the database driver) — the
+  `array` and `null` drivers don't protect against replays: `array` forgets used nonces with the next request
+  process, `null` stores nothing at all, and with several nodes without a shared cache each node only sees the
+  nonces already used on itself.
 
-## Entwicklung
+## Development
 
-Läuft wie alles lokal im `tools`-Container (siehe README im Wurzelverzeichnis), aus dem Wurzelverzeichnis:
+Like everything local, it runs in the `tools` container (see the README in the repository root), from the
+repository root:
 
 ```bash
 docker compose run --rm -w /app/agents/laravel tools composer install
-docker compose run --rm -w /app/agents/laravel tools composer test   # Pint und Pest
+docker compose run --rm -w /app/agents/laravel tools composer test   # Pint and Pest
 ```
 
-## Änderungen
+## Changes
 
-Was sich zwischen den Versionen geändert hat, steht in [`CHANGELOG.md`](CHANGELOG.md) (Englisch) und in den
-GitHub-Releases.
+What changed between versions is in [`CHANGELOG.md`](CHANGELOG.md) and in the GitHub releases.
 
-## Lizenz
+## License
 
-MIT, siehe `LICENSE`.
+MIT, see `LICENSE`.
