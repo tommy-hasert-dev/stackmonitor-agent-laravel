@@ -5,6 +5,16 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.16.0] - 2026-10-10
+
+### Added
+
+- Reports the default cache store and its driver (redis, file, database …)
+  and whether spatie/laravel-responsecache is installed and on, in
+  `extra.cache`. The dashboard shows both in the operational data and next
+  to the page cache it sees in the response. Needs a dashboard that knows the
+  field, so the dashboard is deployed first.
+
 ## [1.15.0] - 2026-10-10
 
 ### Added

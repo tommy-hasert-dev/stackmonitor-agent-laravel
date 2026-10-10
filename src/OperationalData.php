@@ -12,7 +12,8 @@ use Throwable;
  * yet, whether config and routes are cached, the last backup (#64), the
  * PHP settings (#140), every scheduled task with its last run (#138), the
  * failed logins per hour (#145), PHP files where only uploads belong
- * (#144), the last deploy (#150) and the size of the database (#149). A
+ * (#144), the last deploy (#150), the size of the database (#149) and the
+ * cache store with whether spatie/laravel-responsecache caches pages (#155). A
  * value the agent can't read is null; one that doesn't apply (no
  * failed-jobs store, sync queue) is left out.
  */
@@ -59,6 +60,27 @@ final class OperationalData
             'suspicious_files' => $this->attempt(fn () => $this->app->make(SuspiciousFiles::class)->report()),
             'deploy' => $this->attempt(fn () => (new Deploys($this->app, $this->basePath))->report()),
             'database' => $this->attempt(fn () => $this->app->make(DatabaseSize::class)->report()),
+            'cache' => $this->cache(),
+        ];
+    }
+
+    /**
+     * The default cache store and its driver, and spatie/laravel-responsecache:
+     * null when it isn't installed, else whether it is on. The one package
+     * that caches whole pages in Laravel; the dashboard shows it next to the
+     * page cache it sees from outside.
+     *
+     * @return array{store: string|null, driver: string|null, response_cache: bool|null}
+     */
+    private function cache(): array
+    {
+        $store = config('cache.default');
+        $driver = is_string($store) ? config("cache.stores.{$store}.driver") : null;
+
+        return [
+            'store' => is_string($store) && $store !== '' ? $store : null,
+            'driver' => is_string($driver) && $driver !== '' ? $driver : null,
+            'response_cache' => class_exists('Spatie\\ResponseCache\\ResponseCache') ? (bool) config('responsecache.enabled', true) : null,
         ];
     }
 

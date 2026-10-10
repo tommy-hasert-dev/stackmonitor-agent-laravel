@@ -47,6 +47,10 @@ disk space, migrations not yet run and whether config and routes are cached. For
 start of `schedule:run` in the app's default cache; until the first run after installation it reports "no run
 yet". Whatever it cannot read it reports as unknown.
 
+Since 1.16.0 it also reports the default cache store and its driver (`redis`, `file`, `database` …) and whether
+`spatie/laravel-responsecache` is installed and on (`responsecache.enabled`). The dashboard shows both in the
+operational data and next to the page cache it sees from the uptime check's response.
+
 Since 1.4.0 it also reports the last backup of `spatie/laravel-backup` if the app uses it: the newest backup
 file on the configured disks with the `local` driver. It does not query remote disks (S3, FTP …), as that would
 cost a network request on every report; if the app only backs up there, it reports the time as unknown.

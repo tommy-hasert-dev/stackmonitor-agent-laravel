@@ -182,3 +182,15 @@ it('matches the shared schema', function () {
 
     expect($result->isValid())->toBeTrue();
 });
+
+it('reports the cache store and that no response cache is installed', function () {
+    config(['cache.default' => 'redis', 'cache.stores.redis' => ['driver' => 'redis', 'connection' => 'cache']]);
+
+    expect(operationalData()['cache'])->toBe(['store' => 'redis', 'driver' => 'redis', 'response_cache' => null]);
+});
+
+it('knows an unknown cache store has no driver', function () {
+    config(['cache.default' => 'missing']);
+
+    expect(operationalData()['cache'])->toBe(['store' => 'missing', 'driver' => null, 'response_cache' => null]);
+});
