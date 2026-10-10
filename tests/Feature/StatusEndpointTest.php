@@ -142,6 +142,51 @@ it('is disabled without a configured secret', function () {
     $this->get('/stackmonitor/status', signedHeaders())->assertNotFound();
 });
 
+const OTHER_SECRET = 'a9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8';
+
+it('answers every instance with its own secret from STACKMONITOR_AGENT_SECRETS', function () {
+    config(['stackmonitor-agent.secrets' => ' '.OTHER_SECRET.' , '.str_repeat('b', 64)]);
+
+    foreach ([TestCase::SECRET, OTHER_SECRET, str_repeat('b', 64)] as $secret) {
+        $headers = signedHeaders(secret: $secret);
+        $response = $this->get('/stackmonitor/status', $headers)->assertOk();
+
+        expect($response->headers->get('X-Monitor-Signature'))
+            ->toBe(Signature::forResponse($response->getContent(), $headers['X-Monitor-Nonce'], $secret));
+    }
+});
+
+it('takes the secrets alone, without STACKMONITOR_AGENT_SECRET', function () {
+    config(['stackmonitor-agent.secret' => null, 'stackmonitor-agent.secrets' => OTHER_SECRET]);
+
+    $this->get('/stackmonitor/status', signedHeaders(secret: OTHER_SECRET))->assertOk();
+    $this->get('/stackmonitor/status', signedHeaders())->assertNotFound();
+});
+
+it('skips a secret shorter than 32 characters but keeps the others', function () {
+    config(['stackmonitor-agent.secrets' => 'changeme,'.OTHER_SECRET]);
+
+    $this->get('/stackmonitor/status', signedHeaders(secret: 'changeme'))->assertNotFound();
+    $this->get('/stackmonitor/status', signedHeaders(secret: OTHER_SECRET))->assertOk();
+});
+
+it('takes at most five secrets', function () {
+    $secrets = array_map(fn (int $i) => str_repeat((string) $i, 64), range(1, 5));
+    config(['stackmonitor-agent.secrets' => implode(',', $secrets)]);
+
+    // STACKMONITOR_AGENT_SECRET comes first, so the fifth of the list is one too many.
+    $this->get('/stackmonitor/status', signedHeaders(secret: $secrets[3]))->assertOk();
+    $this->get('/stackmonitor/status', signedHeaders(secret: $secrets[4]))->assertNotFound();
+});
+
+it('lets a nonce through only once, whichever secret signed it', function () {
+    config(['stackmonitor-agent.secrets' => OTHER_SECRET]);
+    $nonce = bin2hex(random_bytes(16));
+
+    $this->get('/stackmonitor/status', signedHeaders(nonce: $nonce))->assertOk();
+    $this->get('/stackmonitor/status', signedHeaders(nonce: $nonce, secret: OTHER_SECRET))->assertNotFound();
+});
+
 it('does not start a session', function () {
     $this->get('/stackmonitor/status', signedHeaders())->assertCookieMissing(config('session.cookie'));
 });

@@ -20,6 +20,11 @@ Supports Laravel 10–13 and PHP ≥ 8.1.
    secret, a different path), run `php artisan config:cache` again and, if routes are cached,
    `php artisan route:cache` — otherwise the old, cached configuration stays in effect.
 
+Since 1.15.0 further secrets go comma-separated into `STACKMONITOR_AGENT_SECRETS`, one per StackMonitor
+instance or account that monitors the app (an agency and its client, production and a local stack), five in all
+with `STACKMONITOR_AGENT_SECRET`. To change a secret without a gap, add the new one there, switch the dashboard
+to it and remove the old one afterwards.
+
 The endpoint is `GET /stackmonitor/status`. The path can be changed with `STACKMONITOR_AGENT_PATH`; the agent URL in the dashboard then has to be changed to match.
 
 ## Errors in the log

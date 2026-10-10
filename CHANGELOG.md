@@ -5,6 +5,17 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.15.0] - 2026-10-10
+
+### Added
+
+- More secrets in `STACKMONITOR_AGENT_SECRETS`, comma-separated, next to
+  `STACKMONITOR_AGENT_SECRET`, so several StackMonitor instances or accounts
+  can monitor the same app, or a secret can be changed without a gap. The
+  agent takes five in all, `STACKMONITOR_AGENT_SECRET` first, and skips any
+  shorter than 32 characters. The secret that signed a request signs the
+  answer.
+
 ## [1.14.0] - 2026-10-07
 
 ### Added

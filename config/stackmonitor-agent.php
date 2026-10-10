@@ -2,6 +2,9 @@
 
 return [
     'secret' => env('STACKMONITOR_AGENT_SECRET'),
+    // More secrets, comma-separated, for further StackMonitor instances or to change
+    // the secret without a gap: the agent takes 5 in all, the one above first.
+    'secrets' => env('STACKMONITOR_AGENT_SECRETS'),
     'path' => env('STACKMONITOR_AGENT_PATH', 'stackmonitor/status'),
     'max_clock_skew' => 300,
     // Send the three most frequent log messages along with the error count;
