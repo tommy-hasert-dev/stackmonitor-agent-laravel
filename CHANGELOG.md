@@ -5,6 +5,18 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.17.0] - 2026-10-11
+
+### Added
+
+- Checks with every report whether the services the app depends on answer, in
+  `extra.services`: the database connections in use, Redis, the default cache
+  store and queue, the disks in use (remote ones only read) and the SMTP
+  server up to `EHLO`, each with a timeout of 2 seconds and without
+  credentials in the messages. The last results of spatie/laravel-health come
+  along. Needs a dashboard that knows the field, so the dashboard is deployed
+  first.
+
 ## [1.16.0] - 2026-10-10
 
 ### Added

@@ -13,7 +13,8 @@ use Throwable;
  * PHP settings (#140), every scheduled task with its last run (#138), the
  * failed logins per hour (#145), PHP files where only uploads belong
  * (#144), the last deploy (#150), the size of the database (#149) and the
- * cache store with whether spatie/laravel-responsecache caches pages (#155). A
+ * cache store with whether spatie/laravel-responsecache caches pages (#155)
+ * and whether the services the app depends on answer (#156). A
  * value the agent can't read is null; one that doesn't apply (no
  * failed-jobs store, sync queue) is left out.
  */
@@ -61,6 +62,7 @@ final class OperationalData
             'deploy' => $this->attempt(fn () => (new Deploys($this->app, $this->basePath))->report()),
             'database' => $this->attempt(fn () => $this->app->make(DatabaseSize::class)->report()),
             'cache' => $this->cache(),
+            'services' => $this->attempt(fn () => $this->app->make(Services::class)->report()),
         ];
     }
 

@@ -134,6 +134,27 @@ estimate a row count. It measures about once a day (every 23 hours, so no day is
 with the result kept in the app's default cache; if the measurement fails, it tries again after an hour. For
 other drivers (PostgreSQL, SQL Server) and an in-memory database the value is missing.
 
+## Services
+
+Since 1.17.0 the agent checks with every report whether the services the app depends on answer, in
+`extra.services`, without any setup. What it checks comes from the app's config, each with a timeout of 2 seconds:
+
+- **Database:** the default connection and the ones the queue, failed jobs, cache and sessions use, with `select 1`.
+- **Redis:** the connections the default cache store, the default queue and the sessions use, with `PING`. The
+  connections Laravel's config has by default but the app doesn't use stay out.
+- **Cache:** the default store, by writing, reading and removing a key starting with `stackmonitor-agent-probe-`.
+- **Queue:** the default connection by its size; `sync` has none.
+- **Storage:** the default and cloud disk and the ones set up (local with an existing folder, S3 with a bucket,
+  FTP/SFTP with a host). Local disks get a file starting with `stackmonitor-agent-probe-` written, read and
+  removed; remote disks are only read (S3: one key listed), which costs next to nothing and leaves nothing behind.
+- **Mail:** the default mailer (each of a failover or round robin): SMTP up to the server's answer to `EHLO`,
+  without logging in or sending a mail; other transports (Mailgun, Postmark, SES, sendmail, log …) are only named.
+
+A cache or queue on a connection that already failed is skipped. The result per service is ok or failed, with
+the time it took and a short error message; values of `password`, `secret`, `key`, `token`, `username` and `url`
+from the service's config are replaced by `***`. If the app has `spatie/laravel-health`, the results of its last
+run come along.
+
 ## npm packages
 
 Since 1.6.0 it reports the app's JavaScript packages, so the dashboard can check them for vulnerabilities.
