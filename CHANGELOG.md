@@ -17,7 +17,8 @@ here, with the same version as `ReportBuilder::AGENT_VERSION`.
   5000 files; no content leaves the server for it. Linked folders inside a
   package aren't followed. The file lists are read within 2 seconds per
   report and kept in the app's cache for 10 minutes; a package that doesn't
-  get through in time waits behind the others.
+  get through in time waits behind the others and gets 20 seconds of a
+  later report to itself.
 - With `STACKMONITOR_AGENT_FILE_CONTENTS=true` the dashboard may fetch the
   PHP files of one of these packages as a ZIP by the package's id from the
   report: only its `*.php` files, nothing outside its folder, at most 5000

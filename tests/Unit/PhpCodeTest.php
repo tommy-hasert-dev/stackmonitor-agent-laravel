@@ -279,3 +279,24 @@ it('stops counting past the file limit', function () {
     array_map('unlink', glob($root.'/*.php'));
     rmdir($root);
 });
+
+it('gives a package cut off before a time of its own, once per report', function () {
+    $root = sys_get_temp_dir().'/sm-php-code-'.uniqid();
+    mkdir($root.'/a', 0777, true);
+    mkdir($root.'/b', 0777, true);
+    file_put_contents($root.'/a/A.php', '<?php');
+    file_put_contents($root.'/b/B.php', '<?php');
+    $a = ['type' => 'composer', 'name' => 'acme/a', 'id' => hash('sha256', 'composer:acme/a'), 'root' => $root.'/a'];
+    $b = ['type' => 'composer', 'name' => 'acme/b', 'id' => hash('sha256', 'composer:acme/b'), 'root' => $root.'/b'];
+
+    // The report's time is up, yet the one cut off last time is measured; the other isn't.
+    [$state, $report] = PhpCode::measure([$a['id'] => ['tried' => 10], $b['id'] => ['tried' => 10]], [$a, $b], 20, 5000, microtime(true) - 1);
+
+    expect(array_column($report, 'name'))->toHaveCount(1)
+        ->and($state[$a['id']]['at'] ?? $state[$b['id']]['at'])->toBe(20);
+
+    array_map('unlink', [$root.'/a/A.php', $root.'/b/B.php']);
+    rmdir($root.'/a');
+    rmdir($root.'/b');
+    rmdir($root);
+});

@@ -165,7 +165,8 @@ time of every `*.php` file, never their contents; above 5000 files it sends no f
 files inside a package are skipped, only a package folder that is itself a link (a path repository) is followed.
 It reads the file lists within 2 seconds per report and keeps each result in the app's default cache for 10
 minutes; the packages read longest ago come first, one there is no time left for keeps its last result or is sent
-once it has had its turn, and one that doesn't get through in time waits behind the others. The public packages the dashboard fetches from Packagist itself.
+once it has had its turn, and one that doesn't get through in time waits behind the others and gets 20 seconds of a
+later report to itself. The public packages the dashboard fetches from Packagist itself.
 
 With `STACKMONITOR_AGENT_FILE_CONTENTS=true` (see suspicious files) the dashboard may also fetch the PHP files of
 one of these packages as a ZIP, requested by the package's ID from the report: every `*.php` file of the package

@@ -26,7 +26,8 @@ use ZipArchive;
  * is kept in the app's cache and reused for CACHE_SECONDS; the ones looked
  * at longest ago come first, and a package the time isn't left for keeps
  * its last result, or is left out until it had its turn. One that didn't
- * get through in time goes to the back, so it can't hold up the others.
+ * get through in time goes to the back, so it can't hold up the others,
+ * and gets MAX_SECONDS_ALONE of a later report to itself.
  */
 final class PhpCode
 {
@@ -43,6 +44,12 @@ final class PhpCode
 
     /** Seconds a package's fingerprint is reused before it is measured again. */
     public const CACHE_SECONDS = 600;
+
+    /**
+     * Seconds one package that didn't get through in MAX_SECONDS gets once
+     * per report, so a large folder is measured some time.
+     */
+    public const MAX_SECONDS_ALONE = 20.0;
 
     /** Folders without PHP that run on the server, not walked through. */
     private const SKIPPED_FOLDERS = ['node_modules', '.git'];
@@ -139,6 +146,8 @@ final class PhpCode
         $order = $packages;
         usort($order, fn (array $a, array $b) => $lookedAt($a) <=> $lookedAt($b));
 
+        $alone = false;
+
         foreach ($order as $package) {
             $last = $next[$package['id']] ?? null;
 
@@ -146,11 +155,15 @@ final class PhpCode
                 continue;
             }
 
-            if (microtime(true) >= $deadline) {
-                break;
+            // Cut off before and never measured since: once a report, a longer time of its own.
+            $long = ! $alone && is_array($last) && isset($last['tried']) && (int) $last['tried'] >= (int) ($last['at'] ?? 0);
+
+            if (! $long && microtime(true) >= $deadline) {
+                continue;
             }
 
-            $files = self::files($package['root'], $maxFiles, $deadline);
+            $alone = $alone || $long;
+            $files = self::files($package['root'], $maxFiles, $long ? microtime(true) + self::MAX_SECONDS_ALONE : $deadline);
 
             if ($files === null) {
                 $next[$package['id']] = [...(is_array($last) ? $last : []), 'tried' => $now];
