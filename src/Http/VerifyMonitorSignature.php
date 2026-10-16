@@ -30,7 +30,8 @@ final class VerifyMonitorSignature
         $nonce = (string) $request->header('X-Monitor-Nonce', '');
         $signature = (string) $request->header('X-Monitor-Signature', '');
         $maxSkew = (int) config('stackmonitor-agent.max_clock_skew', 300);
-        // A request for the content of one suspicious file signs its path hash along.
+        // A request for the content of one suspicious file signs its path hash along,
+        // one for the PHP files of a package (#159) the package's id.
         $file = (string) $request->header('X-Monitor-File', '');
 
         $valid = ctype_digit($timestamp)

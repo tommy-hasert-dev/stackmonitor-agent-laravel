@@ -5,6 +5,26 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.18.0] - 2026-10-15
+
+### Added
+
+- Reports the PHP code the dashboard can't download itself for the PHP
+  upgrade forecast, in `extra.php_code`: the app's own code (`app/`) and the
+  packages of `composer.lock` that aren't on packagist.org, development
+  packages left out. Each with the number of PHP files, their size and a
+  fingerprint over path, size and date of every `*.php` file, none above
+  5000 files; no content leaves the server for it. Linked folders inside a
+  package aren't followed. The file lists are read within 2 seconds per
+  report and kept in the app's cache for 10 minutes; a package that doesn't
+  get through in time waits behind the others.
+- With `STACKMONITOR_AGENT_FILE_CONTENTS=true` the dashboard may fetch the
+  PHP files of one of these packages as a ZIP by the package's id from the
+  report: only its `*.php` files, nothing outside its folder, at most 5000
+  files and 8 MB of ZIP; without the PHP extension `zip` none. The report
+  says in `php_code.contents` whether it is on. Needs a dashboard that knows
+  the field, so the dashboard is deployed first.
+
 ## [1.17.0] - 2026-10-11
 
 ### Added

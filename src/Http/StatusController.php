@@ -4,6 +4,7 @@ namespace StackMonitor\Agent\Http;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use StackMonitor\Agent\PhpCode;
 use StackMonitor\Agent\ReportBuilder;
 use StackMonitor\Agent\SuspiciousFiles;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -12,9 +13,11 @@ final class StatusController
 {
     /**
      * The report, or with X-Monitor-File the start of one suspicious file of
-     * the last scan, if the app allows it (STACKMONITOR_AGENT_FILE_CONTENTS).
+     * the last scan or the PHP files of one reported package as a ZIP
+     * (#159), if the app allows it (STACKMONITOR_AGENT_FILE_CONTENTS). Both
+     * are asked for by a SHA-256, the path's or the package's id.
      */
-    public function __invoke(Request $request, ReportBuilder $builder, SuspiciousFiles $files): JsonResponse
+    public function __invoke(Request $request, ReportBuilder $builder, SuspiciousFiles $files, PhpCode $code): JsonResponse
     {
         $file = (string) $request->header('X-Monitor-File', '');
 
@@ -23,7 +26,7 @@ final class StatusController
         }
 
         $content = filter_var(config('stackmonitor-agent.file_contents'), FILTER_VALIDATE_BOOL)
-            ? $files->content($file)
+            ? ($files->content($file) ?? $code->archive($file))
             : null;
 
         if ($content === null) {

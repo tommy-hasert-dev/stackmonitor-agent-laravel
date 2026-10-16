@@ -14,7 +14,9 @@ return [
     // absolute; null means .stackmonitor-deploy in the app.
     'deploy_file' => env('STACKMONITOR_AGENT_DEPLOY_FILE'),
     // Lets the dashboard read the start (at most 64 KB) of a suspicious file
-    // the agent found itself, to look for signs of malicious code. Off unless
+    // the agent found itself, to look for signs of malicious code, and the
+    // PHP files of the app's own code and of the packages not on Packagist
+    // as a ZIP (at most 8 MB), for the PHP upgrade forecast. Off unless
     // switched on here; the dashboard can't switch it on.
     'file_contents' => env('STACKMONITOR_AGENT_FILE_CONTENTS', false),
 ];

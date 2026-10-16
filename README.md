@@ -155,6 +155,24 @@ the time it took and a short error message; values of `password`, `secret`, `key
 from the service's config are replaced by `***`. If the app has `spatie/laravel-health`, the results of its last
 run come along.
 
+## PHP code
+
+Since 1.18.0 it reports the PHP code the dashboard cannot download itself, so it can tell whether the next PHP
+version breaks the site: the app's own code (`app/`) and every package from `composer.lock` that is not on
+packagist.org (from a VCS, path or Private Packagist repository); development packages stay out. For each it
+sends the number of PHP files, their total size and a fingerprint, a SHA-256 over path, size and modification
+time of every `*.php` file, never their contents; above 5000 files it sends no fingerprint. Linked folders and
+files inside a package are skipped, only a package folder that is itself a link (a path repository) is followed.
+It reads the file lists within 2 seconds per report and keeps each result in the app's default cache for 10
+minutes; the packages read longest ago come first, one there is no time left for keeps its last result or is sent
+once it has had its turn, and one that doesn't get through in time waits behind the others. The public packages the dashboard fetches from Packagist itself.
+
+With `STACKMONITOR_AGENT_FILE_CONTENTS=true` (see suspicious files) the dashboard may also fetch the PHP files of
+one of these packages as a ZIP, requested by the package's ID from the report: every `*.php` file of the package
+at its path inside it, nothing else and nothing outside the package's folder, at most 5000 files and 8 MB of
+ZIP. Without the PHP extension `zip` it gets none. Whether it is allowed is stated in the report under
+`php_code.contents`. The request is signed like any other, including the package's ID.
+
 ## npm packages
 
 Since 1.6.0 it reports the app's JavaScript packages, so the dashboard can check them for vulnerabilities.

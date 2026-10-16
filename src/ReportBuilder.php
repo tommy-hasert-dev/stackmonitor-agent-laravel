@@ -7,7 +7,7 @@ use StackMonitor\Agent\ErrorLog\ErrorLog;
 
 final class ReportBuilder
 {
-    public const AGENT_VERSION = '1.17.0';
+    public const AGENT_VERSION = '1.18.0';
 
     /** What composer.lock records for a package installed from packagist.org. */
     private const PACKAGIST_NOTIFICATION_URL = 'https://packagist.org/downloads/';
@@ -114,11 +114,22 @@ final class ReportBuilder
                 'version' => (string) $package['version'],
                 'update_available' => null,
                 'direct' => in_array($package['name'], $direct, true),
-                'listed' => ($package['notification-url'] ?? null) === self::PACKAGIST_NOTIFICATION_URL,
+                'listed' => self::listed($package),
             ];
         }
 
         return $packages;
+    }
+
+    /**
+     * Whether composer.lock records the package as installed from
+     * packagist.org; PhpCode reports the code of the others (#159).
+     *
+     * @param  array<mixed>  $package  as in composer.lock
+     */
+    public static function listed(array $package): bool
+    {
+        return ($package['notification-url'] ?? null) === self::PACKAGIST_NOTIFICATION_URL;
     }
 
     /**
