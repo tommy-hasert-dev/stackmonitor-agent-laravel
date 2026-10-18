@@ -155,6 +155,16 @@ the time it took and a short error message; values of `password`, `secret`, `key
 from the service's config are replaced by `***`. If the app has `spatie/laravel-health`, the results of its last
 run come along.
 
+## Test mail
+
+Since 1.19.0 the dashboard can ask the agent to send a test mail through the app's default mailer, the way a
+contact form or an order confirmation would, to check that mails really go out and arrive. The request names
+only a token and the recipient, StackMonitor's own mailbox, both signed along; subject (`[StackMonitor] Testmail
+– bitte ignorieren`) and text are fixed, the token goes into the header `X-StackMonitor-Test` and the text. The
+answer says whether the mailer took the mail, its error message if not, and the mailer's transport (`smtp`,
+`ses`, `log` …). The agent sends one test mail a minute at most. The mail goes through the app's mail events
+like any other, so a listener that logs or copies mails sees it too.
+
 ## PHP code
 
 Since 1.18.0 it reports the PHP code the dashboard cannot download itself, so it can tell whether the next PHP
@@ -190,7 +200,8 @@ reports that; without a `package.json` this part is left out.
 - The endpoint answers invalid requests with `404` — the same generic 404 that Laravel returns for unknown routes, for every HTTP method, so the endpoint doesn't stand out from the outside. The response to a valid request is signed as well.
 - Known limitation: with `APP_DEBUG=true`, the error page of a rejected request shows the stack trace and the
   agent in it. In production `APP_DEBUG` belongs on `false` anyway, otherwise the whole application is exposed.
-- The agent is read-only: no write actions, no session, no cookies.
+- The agent is read-only: no write actions, no session, no cookies. The one thing it does on request is send
+  the test mail above, with a fixed text, at most one a minute.
 - For replay protection it uses the application's default cache (`cache.default`). This cache has to be
   **persistent and, with several application nodes, shared** (e.g. Redis or the database driver) — the
   `array` and `null` drivers don't protect against replays: `array` forgets used nonces with the next request

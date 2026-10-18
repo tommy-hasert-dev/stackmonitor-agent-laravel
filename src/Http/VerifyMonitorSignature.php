@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use StackMonitor\Agent\Signature;
+use StackMonitor\Agent\TestMail;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -33,20 +34,26 @@ final class VerifyMonitorSignature
         // A request for the content of one suspicious file signs its path hash along,
         // one for the PHP files of a package (#159) the package's id.
         $file = (string) $request->header('X-Monitor-File', '');
+        // A request for a test mail (#133) signs its token and recipient along.
+        $mail = (string) $request->header('X-Monitor-Mail', '');
+        $to = (string) $request->header('X-Monitor-Mail-To', '');
 
         $valid = ctype_digit($timestamp)
             && abs(time() - (int) $timestamp) <= $maxSkew
             && preg_match('/^[a-f0-9]{32}$/', $nonce) === 1
-            && ($file === '' || preg_match('/^[a-f0-9]{64}$/', $file) === 1);
+            && ($file === '' || preg_match('/^[a-f0-9]{64}$/', $file) === 1)
+            && (($mail === '' && $to === '') || ($file === '' && TestMail::valid($mail, $to)));
 
         // Each StackMonitor instance signs with its own secret (#223); the one that matches
         // signs the answer too, so no instance learns anything about the others.
         $secret = null;
 
         foreach ($valid ? self::secrets() : [] as $candidate) {
-            $expected = $file === ''
-                ? Signature::forRequest($timestamp, $nonce, $candidate)
-                : Signature::forFileRequest($timestamp, $nonce, $file, $candidate);
+            $expected = match (true) {
+                $mail !== '' => Signature::forMailRequest($timestamp, $nonce, $mail, $to, $candidate),
+                $file !== '' => Signature::forFileRequest($timestamp, $nonce, $file, $candidate),
+                default => Signature::forRequest($timestamp, $nonce, $candidate),
+            };
 
             if (hash_equals($expected, $signature)) {
                 $secret = $candidate;

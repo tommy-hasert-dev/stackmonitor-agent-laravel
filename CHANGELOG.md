@@ -5,6 +5,16 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.19.0] - 2026-10-18
+
+### Added
+
+- Sends a test mail through the app's default mailer when the dashboard asks
+  for one with a signed request naming a token and StackMonitor's mailbox,
+  and answers whether the mailer took it, its error if not, and the
+  mailer's transport. Subject and text are fixed, the token goes into the
+  header `X-StackMonitor-Test`; one test mail a minute at most.
+
 ## [1.18.0] - 2026-10-15
 
 ### Added

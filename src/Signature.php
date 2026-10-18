@@ -18,6 +18,15 @@ final class Signature
         return hash_hmac('sha256', $timestamp.'.'.$nonce.'.file.'.$pathHash, $secret);
     }
 
+    /**
+     * A request to send a test mail (#133): token and recipient are signed
+     * along, so neither can be swapped on the way.
+     */
+    public static function forMailRequest(string $timestamp, string $nonce, string $token, string $to, string $secret): string
+    {
+        return hash_hmac('sha256', $timestamp.'.'.$nonce.'.mail.'.$token.'.'.$to, $secret);
+    }
+
     public static function forResponse(string $body, string $nonce, string $secret): string
     {
         return hash_hmac('sha256', $body.'.'.$nonce, $secret);
