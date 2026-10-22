@@ -5,6 +5,28 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.20.0] - 2026-10-22
+
+### Added
+
+- Reports the backlog of the queues in `extra.queues`: the default queue of
+  the default connection and every queue Horizon's supervisors are set up
+  for or work, each with its connection, driver, the number of due jobs and
+  since when the oldest of them waits. Delayed jobs count once they are due,
+  from then on; jobs a worker holds don't count until their reservation
+  expired. On Redis a job released for another try counts without an age,
+  and so does every job on a Laravel that doesn't note the delay in the
+  payload. The database and Redis are
+  read directly, on every supported Laravel version; other drivers through
+  Laravel's `pendingSize()`, where SQS and Beanstalkd know no age. `sync`
+  and `null` are left out, at most 20 queues; a connection that fails isn't
+  asked for its other queues.
+- With laravel/horizon installed, reports in `extra.horizon` whether it
+  runs, is paused or inactive, and its supervisors with their status and
+  number of processes.
+- `queue_pending` stays for older dashboards. Needs a dashboard that knows
+  the new fields, so the dashboard is deployed first.
+
 ## [1.19.0] - 2026-10-18
 
 ### Added

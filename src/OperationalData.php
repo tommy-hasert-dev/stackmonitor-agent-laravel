@@ -16,9 +16,9 @@ use Throwable;
  * cache store with whether spatie/laravel-responsecache caches pages (#155)
  * and whether the services the app depends on answer (#156), and the PHP
  * code the dashboard can't download itself for the PHP upgrade forecast
- * (#159). A
- * value the agent can't read is null; one that doesn't apply (no
- * failed-jobs store, sync queue) is left out.
+ * (#159), the backlog of the queues and Horizon's status (#134). A value
+ * the agent can't read is null; one that doesn't apply (no failed-jobs
+ * store, sync queue, no Horizon) is left out.
  */
 final class OperationalData
 {
@@ -39,14 +39,20 @@ final class OperationalData
             $report['failed_jobs'] = $this->attempt(fn () => method_exists($failer, 'count') ? (int) $failer->count() : null);
         }
 
-        if ((string) config('queue.connections.'.config('queue.default').'.driver') !== 'sync') {
-            // Without pendingSize() (Laravel 10, early 11) there's only size(),
-            // which counts delayed and reserved jobs too: unknown then.
-            $report['queue_pending'] = $this->attempt(function () {
-                $queue = $this->app['queue']->connection();
+        $queues = $this->app->make(Queues::class);
+        $backlog = $this->attempt(fn () => $queues->queues());
 
-                return method_exists($queue, 'pendingSize') ? (int) $queue->pendingSize() : null;
-            });
+        if ($backlog !== []) {
+            $report['queues'] = $backlog;
+        }
+
+        // For dashboards before #134: the due jobs of the default queue.
+        if (! in_array((string) config('queue.connections.'.config('queue.default').'.driver'), ['sync', 'null'], true)) {
+            $report['queue_pending'] = $backlog[0]['pending'] ?? null;
+        }
+
+        if ($queues->horizonInstalled()) {
+            $report['horizon'] = $this->attempt(fn () => $queues->horizon());
         }
 
         return [

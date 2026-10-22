@@ -47,6 +47,11 @@ disk space, migrations not yet run and whether config and routes are cached. For
 start of `schedule:run` in the app's default cache; until the first run after installation it reports "no run
 yet". Whatever it cannot read it reports as unknown.
 
+Since 1.20.0 it reports every queue instead of the default one only: the default queue and the queues Horizon's
+supervisors are set up for or work, each with the number of due jobs and since when the oldest waits (delayed jobs
+count once due, jobs a worker holds only once their reservation expired; SQS and Beanstalkd only the number), and with laravel/horizon whether it
+runs, is paused or inactive, with its supervisors.
+
 Since 1.16.0 it also reports the default cache store and its driver (`redis`, `file`, `database` …) and whether
 `spatie/laravel-responsecache` is installed and on (`responsecache.enabled`). The dashboard shows both in the
 operational data and next to the page cache it sees from the uptime check's response.
