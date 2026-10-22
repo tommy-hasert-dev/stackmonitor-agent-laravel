@@ -5,6 +5,14 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.20.1] - 2026-10-23
+
+### Fixed
+
+- Writes the dates of suspicious files in UTC, like the WordPress agent,
+  instead of in the app's timezone. A file of the last scan can still be
+  read after `app.timezone` changed, its date is compared as a moment.
+
 ## [1.20.0] - 2026-10-22
 
 ### Added

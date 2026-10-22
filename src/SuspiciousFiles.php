@@ -170,7 +170,7 @@ final class SuspiciousFiles
                         'path' => self::relative($path, $root, $base),
                         'kind' => $kind,
                         'size' => is_int($size) ? $size : 0,
-                        'modified_at' => is_int($modified) ? date(DATE_ATOM, $modified) : null,
+                        'modified_at' => is_int($modified) ? gmdate(DATE_ATOM, $modified) : null,
                         // Only for content(): stays in the cache, never in the report.
                         'abs' => $path,
                     ];
@@ -206,7 +206,7 @@ final class SuspiciousFiles
         }
 
         return [
-            'scanned_at' => date(DATE_ATOM, (int) $last['scanned_at']),
+            'scanned_at' => gmdate(DATE_ATOM, (int) $last['scanned_at']),
             'scanned' => (int) $last['scanned'],
             'total' => (int) $last['total'],
             'contents' => $contents,
@@ -261,7 +261,10 @@ final class SuspiciousFiles
         $size = @filesize($path);
         $modified = @filemtime($path);
 
-        if ($size !== ($file['size'] ?? null) || (is_int($modified) ? date(DATE_ATOM, $modified) : null) !== ($file['modified_at'] ?? null)) {
+        // Compared as a moment: a scan from before UTC, or from another app.timezone, still matches.
+        $stored = is_string($file['modified_at'] ?? null) ? strtotime($file['modified_at']) : false;
+
+        if ($size !== ($file['size'] ?? null) || (is_int($modified) ? $modified : false) !== $stored) {
             return null;
         }
 

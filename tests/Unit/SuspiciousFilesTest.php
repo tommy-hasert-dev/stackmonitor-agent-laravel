@@ -191,6 +191,29 @@ it('cuts a large file but hashes all of it', function () {
         ->and($file['size'])->toBe(strlen($code));
 });
 
+it('writes its dates in UTC and still reads a file after app.timezone changed', function () {
+    $base = suspiciousApp(['storage/app/public/shell.php' => '<?php']);
+    date_default_timezone_set('Europe/Berlin');
+
+    try {
+        $state = stateAfterScan($base);
+        date_default_timezone_set('America/New_York');
+
+        expect($state['last']['files'][0]['modified_at'])->toBe('2026-09-21T14:13:20+00:00')
+            ->and(readScanned($state, 'storage/app/public/shell.php', $base))->not->toBeNull();
+    } finally {
+        date_default_timezone_set('UTC');
+    }
+});
+
+it('reads a file of a scan that wrote its dates in local time', function () {
+    $base = suspiciousApp(['storage/app/public/shell.php' => '<?php']);
+    $state = stateAfterScan($base);
+    $state['last']['files'][0]['modified_at'] = '2026-09-21T16:13:20+02:00';
+
+    expect(readScanned($state, 'storage/app/public/shell.php', $base))->not->toBeNull();
+});
+
 it('reads no file the scan did not report', function () {
     $base = suspiciousApp(['storage/app/public/shell.php' => '<?php', '.env' => 'APP_KEY=secret']);
 
