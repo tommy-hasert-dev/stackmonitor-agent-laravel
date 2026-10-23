@@ -5,6 +5,15 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.21.0] - 2026-10-23
+
+### Added
+
+- Reports what a distribution's build adds to the PHP version (Ubuntu's
+  `-1ubuntu2.20`) on its own: such builds often get security fixes
+  without a new version number, so the dashboard only gives a hint for
+  PHP vulnerabilities there instead of a warning.
+
 ## [1.20.3] - 2026-10-23
 
 ### Security

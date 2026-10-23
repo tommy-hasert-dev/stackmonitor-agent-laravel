@@ -7,7 +7,7 @@ use StackMonitor\Agent\ErrorLog\ErrorLog;
 
 final class ReportBuilder
 {
-    public const AGENT_VERSION = '1.20.3';
+    public const AGENT_VERSION = '1.21.0';
 
     /** What composer.lock records for a package installed from packagist.org. */
     private const PACKAGIST_NOTIFICATION_URL = 'https://packagist.org/downloads/';
@@ -30,6 +30,8 @@ final class ReportBuilder
             // PHP_VERSION can carry a distro suffix (e.g. Debian/Ubuntu package builds);
             // compose the plain major.minor.release string instead (schema maxLength 20).
             'php' => PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'.'.PHP_RELEASE_VERSION,
+            // ...and the suffix on its own: distro builds get fixes without a new version number.
+            'php_extra' => substr(trim(PHP_EXTRA_VERSION), 0, 50),
             'packages' => $this->packages(),
             'flags' => ['debug' => (bool) config('app.debug'), 'environment' => (string) $this->app->environment()],
             'extra' => (object) $this->app->make(OperationalData::class)->report(),
