@@ -188,7 +188,7 @@ final class ScheduledTasks
             $command = $this->command($task);
 
             $schedule[$id] = [
-                'command' => mb_substr($command, 0, 2000),
+                'command' => mb_substr(self::masked($command), 0, 2000),
                 'description' => is_string($task->description) && $task->description !== $command ? mb_substr($task->description, 0, 500) : null,
                 'expression' => $task->getExpression(),
                 'repeat_seconds' => isset($task->repeatSeconds) && is_int($task->repeatSeconds) ? $task->repeatSeconds : null,
@@ -286,6 +286,28 @@ final class ScheduledTasks
         return str_starts_with($task->command, $prefix.' ')
             ? trim(substr($task->command, strlen($prefix)))
             : trim($task->command);
+    }
+
+    /**
+     * The command without the secrets a shell command may carry, so they
+     * don't leave the server: passwords of mysqldump and the like, the
+     * credentials of a URL, tokens and keys in a query.
+     */
+    public static function masked(string $command): string
+    {
+        $command = (string) preg_replace([
+            '/(--?(?:password|passwd|pass|pwd)[= ])(\'[^\']*\'|"[^"]*"|\S+)/i',
+            '/\b((?:MYSQL_PWD|PGPASSWORD|[A-Z_]*(?:PASSWORD|SECRET|TOKEN|API_KEY))=)(\'[^\']*\'|"[^"]*"|\S+)/',
+            '#(://[^/\s:@]+:)[^@\s/]+@#',
+            '/([?&](?:token|key|secret|password|api_key|apikey|access_token|signature)=)[^&\s\'"]+/i',
+        ], ['$1***', '$1***', '$1***@', '$1***'], $command);
+
+        // mysql -pSecret: the password glued to -p, only for the clients that take it so.
+        if (preg_match('/\b(?:mysql|mysqldump|mariadb|mariadb-dump|mysqladmin)\b/', $command) === 1) {
+            $command = (string) preg_replace('/(?<=\s)-p(?=[^\s-])\S+/', '-p***', $command);
+        }
+
+        return $command;
     }
 
     private function cache(): Repository

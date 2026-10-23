@@ -40,6 +40,26 @@ it('lists every scheduled task with its schedule, before any run', function () {
         ->and($tasks[2])->toMatchArray(['command' => 'rm -rf /tmp/cache', 'background' => true]);
 });
 
+it('sends a shell command without the secrets in it', function (string $command, string $masked) {
+    expect(ScheduledTasks::masked($command))->toBe($masked);
+})->with([
+    'mysqldump -p' => ['mysqldump -uroot -pGeheim123 shop > /backup/shop.sql', 'mysqldump -uroot -p*** shop > /backup/shop.sql'],
+    'mkdir -p stays' => ['mkdir -p /backup && mysqldump shop', 'mkdir -p /backup && mysqldump shop'],
+    'long option' => ['mysqldump --password=Geheim shop', 'mysqldump --password=*** shop'],
+    'quoted option' => ['pg_dump --password "Ge heim" shop', 'pg_dump --password *** shop'],
+    'variable' => ['MYSQL_PWD=Geheim mysqldump shop', 'MYSQL_PWD=*** mysqldump shop'],
+    'own variable' => ['BACKUP_API_KEY=abc123 ./backup.sh', 'BACKUP_API_KEY=*** ./backup.sh'],
+    'url' => ['curl https://user:Geheim@backup.example/upload', 'curl https://user:***@backup.example/upload'],
+    'query' => ['curl "https://hc.example/ping?token=abc123&x=1"', 'curl "https://hc.example/ping?token=***&x=1"'],
+    'nothing secret' => ['rm -rf /tmp/cache', 'rm -rf /tmp/cache'],
+]);
+
+it('reports the command of a task masked', function () {
+    app(Schedule::class)->exec('mysqldump -uroot -pGeheim shop')->daily();
+
+    expect(scheduledTasks()[0]['command'])->toBe('mysqldump -uroot -p*** shop');
+});
+
 it('knows a task by its command, not its schedule, and numbers a command scheduled twice', function () {
     app(Schedule::class)->command('inspire')->hourly();
     app(Schedule::class)->command('inspire')->daily();

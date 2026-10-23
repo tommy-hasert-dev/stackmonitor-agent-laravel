@@ -5,6 +5,15 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.20.2] - 2026-10-23
+
+### Security
+
+- Masks the secrets in the commands of scheduled shell tasks before they go
+  to the dashboard: the password of `mysqldump -p…` and `--password=…`,
+  variables such as `MYSQL_PWD=…`, the credentials of a URL and tokens or
+  keys in a query.
+
 ## [1.20.1] - 2026-10-23
 
 ### Fixed
