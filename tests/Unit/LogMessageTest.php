@@ -24,3 +24,12 @@ it('keeps a message of a very long line', function () {
     expect(LogMessage::normalize('Boom '.str_repeat('a', 1_000_000)))->toStartWith('Boom aaa')
         ->and(mb_strlen(LogMessage::normalize(str_repeat('/a', 500_000))))->toBeGreaterThan(0);
 });
+
+it('masks short and unquoted secrets named in the message', function (string $raw, string $expected) {
+    expect(LogMessage::normalize($raw))->toBe($expected);
+})->with([
+    'password' => ['Connection failed with password=hunter2', 'Connection failed with password=***'],
+    'bearer' => ['Request rejected: Authorization: Bearer abc', 'Request rejected: Authorization: Bearer ***'],
+    'token' => ['Webhook token: x1y2', 'Webhook token: ***'],
+    'invalid token stays' => ['Invalid token', 'Invalid token'],
+]);

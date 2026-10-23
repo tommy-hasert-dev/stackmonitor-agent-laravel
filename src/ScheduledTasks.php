@@ -14,6 +14,7 @@ use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Foundation\Application;
+use StackMonitor\Agent\ErrorLog\LogMessage;
 use Throwable;
 
 /**
@@ -109,7 +110,7 @@ final class ScheduledTasks
                 $event instanceof ScheduledTaskFailed => [
                     ...$this->finish($run, $now, is_float($run['started_at'] ?? null) ? $now - $run['started_at'] : null, $task->exitCode ?: 1),
                     'status' => 'failed',
-                    'error' => mb_substr(trim($event->exception->getMessage()), 0, self::MAX_ERROR) ?: null,
+                    'error' => self::error($event->exception),
                 ],
                 $event instanceof ScheduledTaskSkipped => [...$run, 'skipped_at' => $now],
                 default => null,
@@ -189,7 +190,7 @@ final class ScheduledTasks
 
             $schedule[$id] = [
                 'command' => mb_substr(self::masked($command), 0, 2000),
-                'description' => is_string($task->description) && $task->description !== $command ? mb_substr($task->description, 0, 500) : null,
+                'description' => is_string($task->description) && $task->description !== $command ? mb_substr(self::masked($task->description), 0, 500) : null,
                 'expression' => $task->getExpression(),
                 'repeat_seconds' => isset($task->repeatSeconds) && is_int($task->repeatSeconds) ? $task->repeatSeconds : null,
                 'timezone' => is_string($timezone) && $timezone !== '' ? $timezone : (string) config('app.timezone', 'UTC'),
@@ -308,6 +309,19 @@ final class ScheduledTasks
         }
 
         return $command;
+    }
+
+    /**
+     * The message of a failed task without the secrets of the app's config
+     * and of the command, as an HTTP client names the URL with its key, and
+     * without the bindings a failed query carries.
+     */
+    private static function error(Throwable $exception): ?string
+    {
+        $message = Secrets::fromConfig()->clean($exception->getMessage(), LogMessage::MAX_INPUT);
+        $message = $message === null ? '' : (string) preg_replace(LogMessage::SQL, LogMessage::SQL_REPLACEMENT, self::masked($message));
+
+        return mb_substr($message, 0, self::MAX_ERROR) ?: null;
     }
 
     private function cache(): Repository

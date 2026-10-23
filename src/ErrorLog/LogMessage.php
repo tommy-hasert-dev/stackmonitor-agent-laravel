@@ -2,11 +2,14 @@
 
 namespace StackMonitor\Agent\ErrorLog;
 
+use StackMonitor\Agent\Secrets;
+
 /**
  * Turns a log message into something that can leave the site: one line, with
- * e-mail addresses, URLs, quoted values, IDs, tokens, IPs, numbers, SQL and
- * directories replaced, capped at MAX_LENGTH. Equal errors with different
- * values end up as the same message, so they can be counted together.
+ * the passwords and tokens named in it, e-mail addresses, URLs, quoted
+ * values, IDs, tokens, IPs, numbers, SQL and directories replaced, capped at
+ * MAX_LENGTH. Equal errors with different values end up as the same
+ * message, so they can be counted together.
  */
 final class LogMessage
 {
@@ -15,10 +18,14 @@ final class LogMessage
     /** Only the start of a very long line is cleaned; the rest would be cut anyway. */
     public const MAX_INPUT = 1000;
 
+    /** Laravel's QueryException appends the query with its bindings filled in. */
+    public const SQL = '/\((?:Connection: [^,)]*, )?SQL: .*$/';
+
+    public const SQL_REPLACEMENT = '(SQL: …)';
+
     /** @var array<string, string> */
     private const REPLACEMENTS = [
-        // Laravel's QueryException appends the query with its bindings filled in.
-        '/\((?:Connection: [^,)]*, )?SQL: .*$/' => '(SQL: …)',
+        self::SQL => self::SQL_REPLACEMENT,
         '/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/' => '<email>',
         '#\b[a-z][a-z0-9+.\-]*://\S+#i' => '<url>',
         // Not after a letter, so "can't" stays.
@@ -36,6 +43,8 @@ final class LogMessage
     public static function normalize(string $message): string
     {
         $message = trim((string) preg_replace('/\s+/u', ' ', mb_substr($message, 0, self::MAX_INPUT, 'UTF-8')));
+        // `password=hunter2`, `Bearer abc`: too short for <token>, not quoted.
+        $message = Secrets::named($message);
 
         foreach (self::REPLACEMENTS as $pattern => $replacement) {
             $message = (string) preg_replace($pattern, $replacement, $message);

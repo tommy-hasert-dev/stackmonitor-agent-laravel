@@ -2,6 +2,7 @@
 
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Mail;
 use StackMonitor\Agent\Signature;
 use StackMonitor\Agent\TestMail;
 use StackMonitor\Agent\Tests\TestCase;
@@ -86,3 +87,24 @@ it('rejects a malformed token or recipient', function (string $token, string $to
     'no address' => [MAIL_TOKEN, 'stackmonitor'],
     'no recipient' => [MAIL_TOKEN, ''],
 ]);
+
+it('tells the error of the mailer without the credentials of the config', function () {
+    config(['mail.mailers.array.username' => 'shop-mailer', 'mail.mailers.array.password' => 'mail-secret-1']);
+    Mail::shouldReceive('raw')->andThrow(new RuntimeException(
+        'Failed to authenticate on SMTP server with username "shop-mailer" using password=mail-secret-1 at https://user:pw@api.mail.test',
+    ));
+
+    $answer = $this->get('/stackmonitor/status', mailHeaders())->assertOk()->json();
+
+    expect($answer['error'])->toBe('Failed to authenticate on SMTP server with username "***" using password=*** at https://***@api.mail.test');
+});
+
+it('sends one test mail a minute even when the app caches in memory only', function (string $driver) {
+    config(['cache.default' => 'memory', 'cache.stores.memory' => ['driver' => $driver]]);
+
+    $this->get('/stackmonitor/status', mailHeaders())->assertOk();
+    app('cache')->forgetDriver('memory');
+
+    expect($this->get('/stackmonitor/status', mailHeaders())->json())
+        ->toMatchArray(['sent' => false, 'error' => 'too_soon']);
+})->with(['array', 'null']);

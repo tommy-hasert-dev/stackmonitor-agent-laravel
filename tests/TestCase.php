@@ -2,8 +2,10 @@
 
 namespace StackMonitor\Agent\Tests;
 
+use Illuminate\Filesystem\Filesystem;
 use Orchestra\Testbench\TestCase as Orchestra;
 use StackMonitor\Agent\AgentServiceProvider;
+use StackMonitor\Agent\OnceStore;
 use StackMonitor\Agent\ReportBuilder;
 
 abstract class TestCase extends Orchestra
@@ -25,6 +27,9 @@ abstract class TestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
+
+        // The array store keeps nothing beyond a test, the agent's files would.
+        (new Filesystem)->deleteDirectory(storage_path(OnceStore::PATH));
 
         $this->app->instance(ReportBuilder::class, new ReportBuilder($this->app, __DIR__.'/fixtures'));
     }

@@ -5,6 +5,30 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.20.3] - 2026-10-23
+
+### Security
+
+- Masks the secrets in the error of a failed scheduled task and of a test
+  mail: the values of the app's config that hold passwords, keys and tokens
+  (also URL-encoded), the credentials of a URL, tokens and keys in a query
+  and the bindings of a failed SQL query. The description of a task is
+  masked like its command.
+- Masks unquoted values named as a password, secret, token or key
+  (`password=…`, `token: …`) and `Authorization`/`Bearer` values in error
+  log messages and the messages of the services, however short. Config
+  keys `passphrase`, `private_key` and ones ending in `_secret`, `_token`,
+  `api_key` count as secrets too.
+- Keeps the nonces of signed requests and the minute between two test
+  mails in files under `storage/framework/cache/stackmonitor-agent` when
+  the app's cache store is `array` or `null`, so a request can't be
+  replayed and test mails can't be sent in a row.
+- Signed answers say `Cache-Control: no-store, private`, `Pragma: no-cache`
+  and `Vary: X-Monitor-Nonce, X-Monitor-Signature`, so no cache in between
+  keeps or serves them.
+- Reads a suspicious file from the handle it checked: one swapped for
+  another file or a link after the checks is not sent.
+
 ## [1.20.2] - 2026-10-23
 
 ### Security

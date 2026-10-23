@@ -276,3 +276,33 @@ it('matches the shared schema', function () {
 
     expect($result->isValid())->toBeTrue();
 });
+
+it('records the error of a failed task without the secrets in it', function () {
+    config(['services.acme.secret' => 'acme-secret-42']);
+    $task = app(Schedule::class)->call(fn () => null)->name('Sync')->hourly();
+
+    event(new ScheduledTaskStarting($task));
+    event(new ScheduledTaskFailed($task, new RuntimeException(
+        "Client error: `GET https://api.acme.test/v1/orders?api_key=k-123&page=2` resulted in a `401 Unauthorized` response:\n{\"error\":\"bad key acme-secret-42\"}",
+    )));
+
+    expect(scheduledTasks()[0]['last_run']['error'])
+        ->toBe('Client error: `GET https://api.acme.test/v1/orders?api_key=***&page=2` resulted in a `401 Unauthorized` response: {"error":"bad key ***"}');
+});
+
+it('records the error of a failed query without its bindings', function () {
+    $task = app(Schedule::class)->call(fn () => null)->name('Import')->hourly();
+
+    event(new ScheduledTaskStarting($task));
+    event(new ScheduledTaskFailed($task, new RuntimeException(
+        "SQLSTATE[23000]: Integrity constraint violation (Connection: mysql, SQL: insert into users (email, password) values (max@example.com, 'hash'))",
+    )));
+
+    expect(scheduledTasks()[0]['last_run']['error'])->toBe('SQLSTATE[23000]: Integrity constraint violation (SQL: …)');
+});
+
+it('reports the description of a task masked', function () {
+    app(Schedule::class)->exec('./backup.sh')->description('Backup mit --password=Geheim')->daily();
+
+    expect(scheduledTasks()[0]['description'])->toBe('Backup mit --password=***');
+});

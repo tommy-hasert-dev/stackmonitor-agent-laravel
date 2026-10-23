@@ -37,16 +37,15 @@ final class Services
     /** The start of every key and file the agent writes. */
     public const PREFIX = 'stackmonitor-agent-probe-';
 
-    /** Config keys whose values never show up in a message. */
-    private const SECRET_KEYS = ['password', 'secret', 'key', 'token', 'username', 'url'];
-
     /** @var array<string, string> the status of each check by its key, for the ones depending on it */
     private array $status = [];
 
-    /** @var list<string> */
-    private array $secrets = [];
+    private readonly Secrets $secrets;
 
-    public function __construct(private readonly Application $app) {}
+    public function __construct(private readonly Application $app)
+    {
+        $this->secrets = new Secrets;
+    }
 
     /**
      * @return array{checks: list<array{key: string, type: string, name: string, driver: string|null, status: string, duration_ms: int|null, message: string|null, depends_on: string|null}>, health: array{finished_at: string|null, checks: list<array{name: string, label: string, status: string, summary: string|null}>}|null}
@@ -387,7 +386,7 @@ final class Services
             return $this->result($type, $name, $driver, 'skipped', dependsOn: $dependsOn);
         }
 
-        $this->collectSecrets($config);
+        $this->secrets->collect($config);
         $started = hrtime(true);
 
         try {
@@ -422,31 +421,7 @@ final class Services
      */
     private function clean(?string $message): ?string
     {
-        if ($message === null) {
-            return null;
-        }
-
-        $message = trim((string) preg_replace('/\s+/', ' ', $message));
-        $message = str_replace($this->secrets, '***', $message);
-        $message = (string) preg_replace('#//[^/@\s]+@#', '//***@', $message);
-
-        return $message === '' ? null : mb_substr($message, 0, self::MAX_MESSAGE);
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $config
-     */
-    private function collectSecrets(array $config): void
-    {
-        foreach ($config as $key => $value) {
-            if (is_array($value)) {
-                $this->collectSecrets($value);
-            } elseif (is_string($key) && in_array(strtolower($key), self::SECRET_KEYS, true) && is_string($value) && strlen($value) >= 4) {
-                $this->secrets[] = $value;
-            }
-        }
-
-        $this->secrets = array_values(array_unique($this->secrets));
+        return $this->secrets->clean($message, self::MAX_MESSAGE);
     }
 
     /**

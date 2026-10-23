@@ -257,19 +257,37 @@ final class SuspiciousFiles
             return null;
         }
 
-        clearstatcache(true, $path);
-        $size = @filesize($path);
-        $modified = @filemtime($path);
+        // Read from the handle that was checked: a file swapped for another
+        // or for a link after the checks above is not the one opened.
+        $handle = @fopen($path, 'rb');
 
-        // Compared as a moment: a scan from before UTC, or from another app.timezone, still matches.
-        $stored = is_string($file['modified_at'] ?? null) ? strtotime($file['modified_at']) : false;
-
-        if ($size !== ($file['size'] ?? null) || (is_int($modified) ? $modified : false) !== $stored) {
+        if ($handle === false) {
             return null;
         }
 
-        $content = @file_get_contents($path, false, null, 0, $maxBytes);
-        $sha256 = @hash_file('sha256', $path);
+        try {
+            $stat = fstat($handle);
+
+            // Compared as a moment: a scan from before UTC, or from another app.timezone, still matches.
+            $stored = is_string($file['modified_at'] ?? null) ? strtotime($file['modified_at']) : false;
+
+            clearstatcache(true, $path);
+            $real = realpath($path);
+            $now = is_string($real) ? @stat($real) : false;
+
+            if (! is_array($stat) || $stat['size'] !== ($file['size'] ?? null) || $stat['mtime'] !== $stored
+                || ! is_array($now) || $now['dev'] !== $stat['dev'] || $now['ino'] !== $stat['ino'] || ! self::inside($path, $roots)) {
+                return null;
+            }
+
+            $size = $stat['size'];
+
+            $content = $maxBytes > 0 ? stream_get_contents($handle, $maxBytes) : '';
+            $hash = hash_init('sha256');
+            $sha256 = rewind($handle) && hash_update_stream($hash, $handle) >= 0 ? hash_final($hash) : false;
+        } finally {
+            fclose($handle);
+        }
 
         if (! is_string($content) || ! is_string($sha256)) {
             return null;

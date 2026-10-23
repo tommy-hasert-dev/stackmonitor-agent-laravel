@@ -129,6 +129,40 @@ it('ignores an unknown _sm cache-buster query parameter (M4)', function () {
     $this->get('/stackmonitor/status?_sm=deadbeefdeadbeefdeadbeefdeadbeef', $headers)->assertOk();
 });
 
+it('ignores the nonce the dashboard appends as query parameter n', function () {
+    $headers = signedHeaders();
+
+    $this->get('/stackmonitor/status?n='.$headers['X-Monitor-Nonce'], $headers)->assertOk();
+});
+
+it('tells every cache in between not to keep or share the answer', function () {
+    $response = $this->get('/stackmonitor/status', signedHeaders())->assertOk();
+
+    expect($response->headers->get('Cache-Control'))->toContain('no-store')->toContain('private')
+        ->and($response->headers->get('Pragma'))->toBe('no-cache')
+        ->and(implode(', ', $response->headers->all('Vary')))->toContain('X-Monitor-Nonce, X-Monitor-Signature');
+});
+
+it('rejects replayed nonces even when the app caches in memory only', function (string $driver) {
+    config(['cache.default' => 'memory', 'cache.stores.memory' => ['driver' => $driver]]);
+    $headers = signedHeaders();
+
+    $this->get('/stackmonitor/status', $headers)->assertOk();
+    // A new request starts with an empty array store.
+    app('cache')->forgetDriver('memory');
+    $this->get('/stackmonitor/status', $headers)->assertNotFound();
+})->with(['array', 'null']);
+
+it('keeps the nonces in the app cache when it lasts', function () {
+    config(['cache.default' => 'file']);
+    $headers = signedHeaders();
+
+    $this->get('/stackmonitor/status', $headers)->assertOk();
+
+    expect(cache()->store('file')->has('stackmonitor-agent:nonce:'.$headers['X-Monitor-Nonce']))->toBeTrue();
+    cache()->store('file')->forget('stackmonitor-agent:nonce:'.$headers['X-Monitor-Nonce']);
+});
+
 it('rejects replayed nonces', function () {
     $headers = signedHeaders();
 

@@ -4,7 +4,7 @@ namespace StackMonitor\Agent\Http;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use StackMonitor\Agent\OnceStore;
 use StackMonitor\Agent\Signature;
 use StackMonitor\Agent\TestMail;
 use Symfony\Component\HttpFoundation\Response;
@@ -61,7 +61,7 @@ final class VerifyMonitorSignature
             }
         }
 
-        if ($secret === null || ! Cache::add('stackmonitor-agent:nonce:'.$nonce, true, $maxSkew * 2 + 1)) {
+        if ($secret === null || ! OnceStore::get()->add('stackmonitor-agent:nonce:'.$nonce, true, $maxSkew * 2 + 1)) {
             // Deliberately the exact exception (and message) Laravel's router throws for an
             // unknown route, so a rejected agent request cannot be told apart from a 404 on
             // any other, unrelated path (spec §7: "generisches 404, damit der Endpoint nach
@@ -71,7 +71,11 @@ final class VerifyMonitorSignature
 
         $response = $next($request);
         $response->headers->set('X-Monitor-Signature', Signature::forResponse((string) $response->getContent(), $nonce, $secret));
-        $response->headers->set('Cache-Control', 'no-store');
+        // The answer belongs to this nonce alone: no cache may keep it or
+        // give it to another request, not even one that ignores Vary.
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Pragma', 'no-cache');
+        $response->headers->set('Vary', 'X-Monitor-Nonce, X-Monitor-Signature', false);
 
         return $response;
     }

@@ -4,9 +4,7 @@ namespace StackMonitor\Agent;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Mail\Message;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -25,6 +23,9 @@ final class TestMail
 
     /** Seconds between two test mails, so a leaked secret can't send many. */
     public const MIN_INTERVAL = 60;
+
+    /** The longest error sent, without the credentials of the app's config. */
+    public const MAX_ERROR = 300;
 
     public function __construct(private readonly Application $app) {}
 
@@ -52,7 +53,7 @@ final class TestMail
             return [...$result, 'error' => 'no_mailer'];
         }
 
-        if (! Cache::add('stackmonitor-agent:test-mail', true, self::MIN_INTERVAL)) {
+        if (! OnceStore::get()->add('stackmonitor-agent:test-mail', true, self::MIN_INTERVAL)) {
             return [...$result, 'error' => 'too_soon'];
         }
 
@@ -62,7 +63,7 @@ final class TestMail
                 $message->getSymfonyMessage()->getHeaders()->addTextHeader(self::HEADER, $token);
             });
         } catch (Throwable $e) {
-            return [...$result, 'error' => Str::limit($e->getMessage(), 300)];
+            return [...$result, 'error' => Secrets::fromConfig()->clean($e->getMessage(), self::MAX_ERROR) ?? $e::class];
         }
 
         return [...$result, 'sent' => true];
