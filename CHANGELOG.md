@@ -5,6 +5,18 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.21.2] - 2026-10-25
+
+### Changed
+
+- Checks the values it reads from the app's config, cache and database
+  in one place: a number written as a string, as `.env` gives it, still
+  counts (`"60"`), anything else takes the default instead of becoming 0
+  or a cut-off number (`"60s"`, `"abc"`). A table size or row count the
+  database doesn't give as a number is reported as unknown, and cached
+  state that doesn't fit is dropped and measured again.
+- Checked by PHPStan with Larastan on its strictest level, 10.
+
 ## [1.21.1] - 2026-10-25
 
 ### Changed

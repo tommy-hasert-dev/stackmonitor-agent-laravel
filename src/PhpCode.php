@@ -28,6 +28,8 @@ use ZipArchive;
  * its last result, or is left out until it had its turn. One that didn't
  * get through in time goes to the back, so it can't hold up the others,
  * and gets MAX_SECONDS_ALONE of a later report to itself.
+ *
+ * @phpstan-type Entry array{fingerprint?: string|null, files?: int, bytes?: int, at?: int, tried?: int}
  */
 final class PhpCode
 {
@@ -67,9 +69,8 @@ final class PhpCode
      */
     public function report(): array
     {
-        $cached = $this->cache()->get(self::CACHE_KEY);
         [$state, $packages] = self::measure(
-            is_array($cached) ? $cached : [],
+            self::state($this->cache()->get(self::CACHE_KEY)),
             self::packages($this->basePath ?? $this->app->basePath()),
             now()->getTimestamp(),
             self::MAX_FILES,
@@ -82,6 +83,39 @@ final class PhpCode
             'contents' => filter_var(config('stackmonitor-agent.file_contents'), FILTER_VALIDATE_BOOL),
             'packages' => $packages,
         ];
+    }
+
+    /**
+     * The cached results as measure() keeps them, by package id: one with
+     * all of `fingerprint`, `files`, `bytes` and `at`, `tried` or both;
+     * anything else is left out.
+     *
+     * @return array<string, Entry>
+     */
+    public static function state(mixed $cached): array
+    {
+        $state = [];
+
+        foreach (Value::map($cached) as $id => $entry) {
+            $entry = Value::array($entry);
+            $fingerprint = $entry['fingerprint'] ?? null;
+            $kept = [];
+
+            if (array_key_exists('fingerprint', $entry) && ($fingerprint === null || is_string($fingerprint))
+                && is_int($entry['files'] ?? null) && is_int($entry['bytes'] ?? null) && is_int($entry['at'] ?? null)) {
+                $kept = ['fingerprint' => $fingerprint, 'files' => $entry['files'], 'bytes' => $entry['bytes'], 'at' => $entry['at']];
+            }
+
+            if (is_int($entry['tried'] ?? null)) {
+                $kept['tried'] = $entry['tried'];
+            }
+
+            if ($kept !== []) {
+                $state[$id] = $kept;
+            }
+        }
+
+        return $state;
     }
 
     /**
@@ -125,9 +159,9 @@ final class PhpCode
      * in their order, without the ones never measured. A package the
      * deadline cut off is marked `tried`, which puts it at the back.
      *
-     * @param  array<string, mixed>  $state  as cached: id => result with `at`, or only `tried`
+     * @param  array<string, Entry>  $state  as state() reads it
      * @param  list<array{type: string, name: string, id: string, root: string}>  $packages
-     * @return array{0: array<string, array{fingerprint?: string|null, files?: int, bytes?: int, at?: int, tried?: int}>, 1: list<array{type: string, name: string, id: string, fingerprint: string|null, files: int, bytes: int}>}
+     * @return array{0: array<string, Entry>, 1: list<array{type: string, name: string, id: string, fingerprint: string|null, files: int, bytes: int}>}
      */
     public static function measure(array $state, array $packages, int $now, int $maxFiles, float $deadline): array
     {
@@ -137,26 +171,31 @@ final class PhpCode
         foreach ($packages as $package) {
             $last = $state[$package['id']] ?? null;
 
-            if (is_array($last) && ($measured($last) || isset($last['tried']))) {
+            if ($last !== null && ($measured($last) || isset($last['tried']))) {
                 $next[$package['id']] = $last;
             }
         }
 
-        $lookedAt = fn (array $package) => max((int) ($next[$package['id']]['at'] ?? 0), (int) ($next[$package['id']]['tried'] ?? 0));
+        $lookedAt = [];
+
+        foreach ($packages as $package) {
+            $lookedAt[$package['id']] = max($next[$package['id']]['at'] ?? 0, $next[$package['id']]['tried'] ?? 0);
+        }
+
         $order = $packages;
-        usort($order, fn (array $a, array $b) => $lookedAt($a) <=> $lookedAt($b));
+        usort($order, fn (array $a, array $b) => $lookedAt[$a['id']] <=> $lookedAt[$b['id']]);
 
         $alone = false;
 
         foreach ($order as $package) {
             $last = $next[$package['id']] ?? null;
 
-            if (is_array($last) && $measured($last) && $now - (int) $last['at'] < self::CACHE_SECONDS) {
+            if ($last !== null && $measured($last) && $now - ($last['at'] ?? 0) < self::CACHE_SECONDS) {
                 continue;
             }
 
             // Cut off before and never measured since: once a report, a longer time of its own.
-            $long = ! $alone && is_array($last) && isset($last['tried']) && (int) $last['tried'] >= (int) ($last['at'] ?? 0);
+            $long = ! $alone && isset($last['tried']) && $last['tried'] >= ($last['at'] ?? 0);
 
             if (! $long && microtime(true) >= $deadline) {
                 continue;
@@ -166,7 +205,7 @@ final class PhpCode
             $files = self::files($package['root'], $maxFiles, $long ? microtime(true) + self::MAX_SECONDS_ALONE : $deadline);
 
             if ($files === null) {
-                $next[$package['id']] = [...(is_array($last) ? $last : []), 'tried' => $now];
+                $next[$package['id']] = [...($last ?? []), 'tried' => $now];
 
                 continue;
             }
@@ -184,14 +223,14 @@ final class PhpCode
         foreach ($packages as $package) {
             $result = $next[$package['id']] ?? null;
 
-            if (is_array($result) && $measured($result)) {
+            if ($result !== null && $measured($result)) {
                 $report[] = [
                     'type' => $package['type'],
                     'name' => $package['name'],
                     'id' => $package['id'],
-                    'fingerprint' => is_string($result['fingerprint']) ? $result['fingerprint'] : null,
-                    'files' => (int) $result['files'],
-                    'bytes' => (int) $result['bytes'],
+                    'fingerprint' => $result['fingerprint'] ?? null,
+                    'files' => $result['files'] ?? 0,
+                    'bytes' => $result['bytes'] ?? 0,
                 ];
             }
         }

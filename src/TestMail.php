@@ -71,7 +71,7 @@ final class TestMail
 
     private static function body(string $token): string
     {
-        $app = (string) config('app.url');
+        $app = Value::string(config('app.url'));
 
         return 'Diese Mail hat StackMonitor über den Mailversand von '.($app !== '' ? $app : 'dieser Website')
             .' verschickt, um zu prüfen, ob Mails aus Kontaktformular oder Shop ankommen. '

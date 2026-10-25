@@ -7,7 +7,7 @@ parameters:
         - routes/
         - src/
 
-    level: 8
+    level: 10
 
     ignoreErrors:
         # Larastan only knows the app's config folder, not the package's.

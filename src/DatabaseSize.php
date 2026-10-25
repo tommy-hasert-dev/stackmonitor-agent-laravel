@@ -19,6 +19,10 @@ use Throwable;
  * database, so the agent measures once MEASURE_AFTER has passed and sends the
  * result kept in the app's cache meanwhile. A failed measurement is tried
  * again after RETRY_AFTER; until then the last good one goes on.
+ *
+ * @phpstan-type Table array{name: string, size: int, rows: int|null}
+ * @phpstan-type Measurement array{measured_at: string, engine: string, source: string, size: int, table_count: int, tables: list<Table>}
+ * @phpstan-type State array{attempted_at?: int, failed?: bool, result?: Measurement}
  */
 final class DatabaseSize
 {
@@ -43,12 +47,11 @@ final class DatabaseSize
      * Measures when due and returns the last good measurement, null before
      * the first one.
      *
-     * @return array{measured_at: string, engine: string, source: string, size: int, table_count: int, tables: list<array{name: string, size: int, rows: int|null}>}|null
+     * @return Measurement|null
      */
     public function report(): ?array
     {
-        $state = $this->cache()->get(self::CACHE_KEY);
-        $state = is_array($state) ? $state : [];
+        $state = self::state($this->cache()->get(self::CACHE_KEY));
         $now = now()->getTimestamp();
 
         if (self::due($state, $now)) {
@@ -56,17 +59,59 @@ final class DatabaseSize
             $this->cache()->forever(self::CACHE_KEY, $state);
         }
 
-        /** @var array{measured_at: string, engine: string, source: string, size: int, table_count: int, tables: list<array{name: string, size: int, rows: int|null}>}|null $result as remember() keeps it */
-        $result = is_array($state['result'] ?? null) ? $state['result'] : null;
+        return $state['result'] ?? null;
+    }
 
-        return $result;
+    /**
+     * The cached state as remember() writes it; whatever doesn't fit is
+     * left out, a broken result as if there were none.
+     *
+     * @return State
+     */
+    public static function state(mixed $cached): array
+    {
+        $cached = Value::array($cached);
+        $state = [];
+
+        if (is_int($cached['attempted_at'] ?? null)) {
+            $state['attempted_at'] = $cached['attempted_at'];
+        }
+
+        if (is_bool($cached['failed'] ?? null)) {
+            $state['failed'] = $cached['failed'];
+        }
+
+        $result = Value::array($cached['result'] ?? null);
+        $tables = [];
+
+        foreach (Value::array($result['tables'] ?? null) as $table) {
+            $rows = is_array($table) ? ($table['rows'] ?? null) : null;
+
+            if (is_array($table) && is_string($table['name'] ?? null) && is_int($table['size'] ?? null) && ($rows === null || is_int($rows))) {
+                $tables[] = ['name' => $table['name'], 'size' => $table['size'], 'rows' => $rows];
+            }
+        }
+
+        if (is_string($result['measured_at'] ?? null) && is_string($result['engine'] ?? null) && is_string($result['source'] ?? null)
+            && is_int($result['size'] ?? null) && is_int($result['table_count'] ?? null)) {
+            $state['result'] = [
+                'measured_at' => $result['measured_at'],
+                'engine' => $result['engine'],
+                'source' => $result['source'],
+                'size' => $result['size'],
+                'table_count' => $result['table_count'],
+                'tables' => $tables,
+            ];
+        }
+
+        return $state;
     }
 
     /**
      * Whether to measure again: before the first measurement, once the last
      * one is MEASURE_AFTER old, or RETRY_AFTER after a failed one.
      *
-     * @param  array<string, mixed>  $state  as cached
+     * @param  State  $state
      */
     public static function due(array $state, int $now): bool
     {
@@ -76,24 +121,22 @@ final class DatabaseSize
 
         $after = ($state['failed'] ?? true) ? self::RETRY_AFTER : self::MEASURE_AFTER;
 
-        return $now - (int) $state['attempted_at'] >= $after;
+        return $now - $state['attempted_at'] >= $after;
     }
 
     /**
      * The state to cache after a measurement; a failed one (null) keeps the
      * last good result.
      *
-     * @param  array<string, mixed>  $state  as cached
-     * @param  array<string, mixed>|null  $measured
-     * @return array{attempted_at: int, failed: bool, result: array<string, mixed>|null}
+     * @param  State  $state
+     * @param  Measurement|null  $measured
+     * @return State
      */
     public static function remember(array $state, ?array $measured, int $now): array
     {
-        return [
-            'attempted_at' => $now,
-            'failed' => $measured === null,
-            'result' => $measured ?? (is_array($state['result'] ?? null) ? $state['result'] : null),
-        ];
+        $result = $measured ?? $state['result'] ?? null;
+
+        return ['attempted_at' => $now, 'failed' => $measured === null, ...($result === null ? [] : ['result' => $result])];
     }
 
     /**
@@ -102,7 +145,7 @@ final class DatabaseSize
      * null when both fail.
      *
      * @param  callable(string): (array<array<array-key, mixed>>|null)  $query  null for a failing query
-     * @return array{measured_at: string, engine: string, source: string, size: int, table_count: int, tables: list<array{name: string, size: int, rows: int|null}>}|null
+     * @return Measurement|null
      */
     public static function mysql(callable $query, int $now): ?array
     {
@@ -122,7 +165,7 @@ final class DatabaseSize
         $rows = array_filter($rows, function (array $row) {
             $row = array_change_key_case($row);
 
-            return ($row['engine'] ?? null) !== null && strtoupper((string) ($row['comment'] ?? '')) !== 'VIEW';
+            return ($row['engine'] ?? null) !== null && strtoupper(Value::string($row['comment'] ?? null)) !== 'VIEW';
         });
 
         return self::forReport('mysql', 'table_status', $now, self::tables($rows, 'Name', 'Data_length', 'Index_length', 'Rows'));
@@ -133,8 +176,8 @@ final class DatabaseSize
      * default summed and counted over the tables, and the MAX_TABLES largest,
      * by size and name.
      *
-     * @param  list<array{name: string, size: int, rows: int|null}>  $tables
-     * @return array{measured_at: string, engine: string, source: string, size: int, table_count: int, tables: list<array{name: string, size: int, rows: int|null}>}
+     * @param  list<Table>  $tables
+     * @return Measurement
      */
     public static function forReport(string $engine, string $source, int $now, array $tables, ?int $size = null, ?int $tableCount = null): array
     {
@@ -152,10 +195,11 @@ final class DatabaseSize
 
     /**
      * The rows of either query as tables, whatever case the server gives the
-     * column names in; a size the server doesn't know counts as 0.
+     * column names in; a size the server doesn't know counts as 0, a row
+     * count it doesn't know is null.
      *
      * @param  iterable<array<array-key, mixed>>  $rows
-     * @return list<array{name: string, size: int, rows: int|null}>
+     * @return list<Table>
      */
     private static function tables(iterable $rows, string $name, string $data, string $index, string $count): array
     {
@@ -163,17 +207,17 @@ final class DatabaseSize
 
         foreach ($rows as $row) {
             $row = array_change_key_case($row);
-            $table = (string) ($row[strtolower($name)] ?? '');
+            $table = Value::string($row[strtolower($name)] ?? null);
 
             if ($table === '') {
                 continue;
             }
 
-            $rowCount = $row[strtolower($count)] ?? null;
+            $rowCount = Value::int($row[strtolower($count)] ?? null, null);
             $tables[] = [
                 'name' => mb_substr($table, 0, 200),
-                'size' => max(0, (int) ($row[strtolower($data)] ?? 0) + (int) ($row[strtolower($index)] ?? 0)),
-                'rows' => $rowCount === null ? null : max(0, (int) $rowCount),
+                'size' => max(0, Value::int($row[strtolower($data)] ?? null) + Value::int($row[strtolower($index)] ?? null)),
+                'rows' => $rowCount === null ? null : max(0, $rowCount),
             ];
         }
 
@@ -184,7 +228,7 @@ final class DatabaseSize
      * Measures the default connection; null for a driver without a size to
      * read (PostgreSQL, SQL Server), a database in memory or a failure.
      *
-     * @return array<string, mixed>|null
+     * @return Measurement|null
      */
     private function measure(int $now): ?array
     {
@@ -212,11 +256,11 @@ final class DatabaseSize
      * the `dbstat` table where SQLite is built with it. SQLite estimates no
      * rows.
      *
-     * @return array<string, mixed>|null
+     * @return Measurement|null
      */
     private function sqlite(Connection $connection, int $now): ?array
     {
-        $path = (string) $connection->getConfig('database');
+        $path = Value::string($connection->getConfig('database'));
         $size = $path === '' || $path === ':memory:' || str_contains($path, 'mode=memory') ? false : @filesize($path);
 
         if (! is_int($size)) {
@@ -232,7 +276,11 @@ final class DatabaseSize
             $rows = [];
         }
 
-        $tables = array_values(array_map(fn ($row) => ['name' => mb_substr((string) $row->name, 0, 200), 'size' => (int) $row->size, 'rows' => null], $rows));
+        $tables = array_values(array_map(function (mixed $row) {
+            $row = (array) $row;
+
+            return ['name' => mb_substr(Value::string($row['name'] ?? null), 0, 200), 'size' => Value::int($row['size'] ?? null), 'rows' => null];
+        }, $rows));
 
         return self::forReport('sqlite', 'file', $now, $tables, $size, $tableCount);
     }

@@ -141,6 +141,20 @@ function readScanned(array $state, string $path, string $base, int $max = Suspic
     return SuspiciousFiles::read($state, hash('sha256', $path), [$base.'/storage/app/public'], $max);
 }
 
+it('starts a broken scan again and leaves out files that do not fit', function () {
+    $file = ['path' => 'storage/app/public/shell.php', 'kind' => 'php', 'size' => 1, 'modified_at' => null, 'abs' => '/app/storage/app/public/shell.php'];
+
+    expect(SuspiciousFiles::state(['run' => ['queue' => 'broken'], 'last' => ['scanned_at' => 1, 'scanned' => 2, 'total' => 2, 'files' => [$file, ['path' => 'x']]]]))
+        ->toBe(['last' => ['scanned_at' => 1, 'scanned' => 2, 'total' => 2, 'files' => [$file]]])
+        ->and(SuspiciousFiles::state(['last' => ['scanned_at' => '1']]))->toBe([]);
+
+    // A scan before #188 kept no absolute path: still reported.
+    unset($file['abs']);
+    $state = SuspiciousFiles::state(['last' => ['scanned_at' => 1, 'scanned' => 2, 'total' => 1, 'files' => [$file]]]);
+
+    expect(SuspiciousFiles::forReport($state)['files'])->toBe([$file]);
+});
+
 it('keeps the absolute path in its cache but never sends it', function () {
     $base = suspiciousApp(['storage/app/public/shell.php' => '<?php system($_GET["c"]);']);
 

@@ -3,8 +3,9 @@
 use Illuminate\Support\Facades\Route;
 use StackMonitor\Agent\Http\StatusController;
 use StackMonitor\Agent\Http\VerifyMonitorSignature;
+use StackMonitor\Agent\Value;
 
-$path = trim((string) config('stackmonitor-agent.path'), '/');
+$path = trim(Value::string(config('stackmonitor-agent.path')), '/');
 
 if ($path === '') {
     $path = 'stackmonitor/status';

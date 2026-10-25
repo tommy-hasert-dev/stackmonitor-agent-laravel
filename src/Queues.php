@@ -3,6 +3,7 @@
 namespace StackMonitor\Agent;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Queue\DatabaseQueue;
 use Illuminate\Queue\RedisQueue;
 use Throwable;
@@ -82,12 +83,12 @@ final class Queues
             return null;
         }
 
-        $masters = $this->app->make(self::MASTERS)->all();
+        $masters = $this->all(self::MASTERS);
         $paused = array_filter($masters, fn (object $master) => ($master->status ?? null) === 'paused');
         $supervisors = array_map(fn (object $supervisor) => [
-            'name' => mb_substr((string) ($supervisor->name ?? ''), 0, 200),
+            'name' => mb_substr(Value::string($supervisor->name ?? null), 0, 200),
             'status' => ($supervisor->status ?? null) === 'paused' ? 'paused' : 'running',
-            'processes' => (int) array_sum(array_map('intval', (array) ($supervisor->processes ?? []))),
+            'processes' => array_sum(array_map(fn (mixed $count) => Value::int($count), Value::array($supervisor->processes ?? null))),
         ], $this->supervisors());
 
         return [
@@ -117,19 +118,17 @@ final class Queues
         $now = time();
 
         if ($queue instanceof DatabaseQueue) {
-            $config = (array) config("queue.connections.{$connection}");
-            $retryAfter = (int) ($config['retry_after'] ?? 60);
-            $row = $queue->getDatabase()->table($config['table'] ?? 'jobs')
+            $config = Value::array(config("queue.connections.{$connection}"));
+            $retryAfter = Value::int($config['retry_after'] ?? null, 60);
+            $row = $queue->getDatabase()->table(Value::string($config['table'] ?? null, 'jobs'))
                 ->where('queue', $name)
-                ->where(fn ($due) => $due
-                    ->where(fn ($ready) => $ready->whereNull('reserved_at')->where('available_at', '<=', $now))
+                ->where(fn (Builder $due) => $due
+                    ->where(fn (Builder $ready) => $ready->whereNull('reserved_at')->where('available_at', '<=', $now))
                     ->orWhere('reserved_at', '<=', $now - $retryAfter))
                 ->selectRaw('count(*) as pending, min(case when reserved_at is null then available_at else reserved_at + ? end) as oldest', [$retryAfter])
                 ->first();
 
-            $oldest = $row->oldest ?? null;
-
-            return [(int) ($row->pending ?? 0), $oldest === null ? null : (int) $oldest];
+            return [Value::int($row->pending ?? null), Value::int($row->oldest ?? null, null)];
         }
 
         if ($queue instanceof RedisQueue) {
@@ -163,20 +162,20 @@ final class Queues
             : $queue->getQueue($name);
         $redis = $queue->getConnection();
 
-        $ready = (int) $redis->llen($key);
+        $ready = Value::int($redis->llen($key));
         $oldest = null;
 
         foreach ($ready > 0 ? (array) $redis->lrange($key, 0, self::REDIS_PEEK - 1) : [] as $payload) {
-            $job = json_decode((string) $payload, true);
+            $job = json_decode(Value::string($payload), true);
 
             if (is_array($job) && ($job['attempts'] ?? 0) === 0 && array_key_exists('delay', $job) && ($created = $this->timestamp($job['createdAt'] ?? null)) !== null) {
-                $oldest = min($oldest ?? PHP_INT_MAX, $created + (int) $job['delay']);
+                $oldest = min($oldest ?? PHP_INT_MAX, $created + Value::int($job['delay']));
             }
         }
 
-        $due = (int) $redis->zcount("{$key}:delayed", '-inf', (string) $now);
+        $due = Value::int($redis->zcount("{$key}:delayed", '-inf', (string) $now));
         $earliest = $due > 0 ? $redis->zrangebyscore("{$key}:delayed", '-inf', (string) $now, ['withscores' => true, 'limit' => [0, 1]]) : [];
-        $dueSince = is_array($earliest) && $earliest !== [] ? (int) reset($earliest) : null;
+        $dueSince = is_array($earliest) && $earliest !== [] ? Value::int(reset($earliest), null) : null;
 
         $times = array_filter([$oldest, $dueSince], fn (?int $time) => $time !== null);
 
@@ -230,23 +229,23 @@ final class Queues
      */
     private function horizonQueues(): array
     {
-        $environment = config('horizon.env') ?? $this->app->environment();
-        $environments = (array) config('horizon.environments');
-        $defaults = (array) config('horizon.defaults');
+        $environment = Value::string(config('horizon.env'), null) ?? $this->app->environment();
+        $environments = Value::array(config('horizon.environments'));
+        $defaults = Value::array(config('horizon.defaults'));
         $names = [];
 
-        foreach ((array) ($environments[$environment] ?? $environments['*'] ?? []) as $supervisor => $options) {
-            $options = array_replace((array) ($defaults[$supervisor] ?? []), (array) $options);
+        foreach (Value::array($environments[$environment] ?? $environments['*'] ?? null) as $supervisor => $options) {
+            $options = array_replace(Value::array($defaults[$supervisor] ?? null), Value::array($options));
             $queues = is_string($options['queue'] ?? null) ? explode(',', $options['queue']) : (array) ($options['queue'] ?? ['default']);
 
             foreach ($queues as $queue) {
-                $names[] = [(string) ($options['connection'] ?? 'redis'), (string) $queue];
+                $names[] = [Value::string($options['connection'] ?? null, 'redis'), Value::string($queue)];
             }
         }
 
         // Without balancing one process works all queues: "redis:default,emails".
         foreach ($this->supervisors() as $supervisor) {
-            foreach (array_keys((array) ($supervisor->processes ?? [])) as $process) {
+            foreach (array_keys(Value::array($supervisor->processes ?? null)) as $process) {
                 if (str_contains((string) $process, ':')) {
                     [$connection, $queues] = explode(':', (string) $process, 2);
 
@@ -265,11 +264,26 @@ final class Queues
      */
     private function supervisors(): array
     {
-        return $this->supervisors ??= array_values((array) $this->app->make(self::SUPERVISORS)->all());
+        return $this->supervisors ??= $this->all(self::SUPERVISORS);
+    }
+
+    /**
+     * What one of Horizon's repositories holds; nothing when it isn't one.
+     *
+     * @return list<object>
+     */
+    private function all(string $repository): array
+    {
+        $repository = $this->app->make($repository);
+        $all = is_object($repository) && method_exists($repository, 'all') ? $repository->all() : [];
+
+        return array_values(array_filter(Value::array($all), 'is_object'));
     }
 
     private function timestamp(mixed $value): ?int
     {
-        return is_numeric($value) && $value > 0 ? (int) $value : null;
+        $value = Value::int($value, null);
+
+        return $value !== null && $value > 0 ? $value : null;
     }
 }

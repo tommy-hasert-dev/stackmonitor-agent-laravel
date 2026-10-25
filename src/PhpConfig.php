@@ -42,7 +42,7 @@ final class PhpConfig
 
             return is_string($value) && trim($value) !== '' ? mb_substr(trim($value), 0, 50) : null;
         };
-        $int = fn (string $name) => is_numeric($ini($name)) ? (int) $ini($name) : null;
+        $int = fn (string $name) => Value::int($ini($name), null);
 
         return [
             'sapi' => mb_substr($sapi, 0, 50),
@@ -75,15 +75,15 @@ final class PhpConfig
 
         $memory = is_array($status['memory_usage'] ?? null) ? $status['memory_usage'] : [];
         $statistics = is_array($status['opcache_statistics'] ?? null) ? $status['opcache_statistics'] : [];
-        $used = isset($memory['used_memory'], $memory['wasted_memory']) ? (int) $memory['used_memory'] + (int) $memory['wasted_memory'] : null;
+        $used = isset($memory['used_memory'], $memory['wasted_memory']) ? Value::int($memory['used_memory']) + Value::int($memory['wasted_memory']) : null;
 
         return [
             'enabled' => (bool) ($status['opcache_enabled'] ?? false),
             // Wasted memory stays taken until OPcache restarts.
             'memory_used' => $used,
-            'memory_total' => $used !== null && isset($memory['free_memory']) ? $used + (int) $memory['free_memory'] : null,
-            'keys_used' => isset($statistics['num_cached_keys']) ? (int) $statistics['num_cached_keys'] : null,
-            'keys_max' => isset($statistics['max_cached_keys']) ? (int) $statistics['max_cached_keys'] : null,
+            'memory_total' => $used !== null && isset($memory['free_memory']) ? $used + Value::int($memory['free_memory']) : null,
+            'keys_used' => Value::int($statistics['num_cached_keys'] ?? null, null),
+            'keys_max' => Value::int($statistics['max_cached_keys'] ?? null, null),
             'full' => isset($status['cache_full']) ? (bool) $status['cache_full'] : null,
         ];
     }
@@ -95,7 +95,7 @@ final class PhpConfig
     private function masterDisplayErrors(): ?string
     {
         $all = function_exists('ini_get_all') ? @ini_get_all(null, true) : false;
-        $value = is_array($all) ? ($all['display_errors']['global_value'] ?? null) : ini_get('display_errors');
+        $value = is_array($all) ? (Value::array($all['display_errors'] ?? null)['global_value'] ?? null) : ini_get('display_errors');
 
         return is_string($value) ? $value : null;
     }

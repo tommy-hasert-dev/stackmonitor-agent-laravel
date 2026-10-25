@@ -19,6 +19,9 @@ use Throwable;
  *
  * Two attempts at the same moment may race and lose a count now and then;
  * the numbers are for trends, a lock on every login isn't worth it.
+ *
+ * @phpstan-type Hour array{failed: int, known: int, ips: list<string>|int}
+ * @phpstan-type State array{since?: int, hours: array<int, Hour>}
  */
 final class FailedLogins
 {
@@ -40,13 +43,12 @@ final class FailedLogins
     public function record(object $event): void
     {
         $this->quietly(function () use ($event) {
-            $state = $this->cache()->get(self::CACHE_KEY);
-            $state = is_array($state) ? $state : [];
+            $state = self::state($this->cache()->get(self::CACHE_KEY));
             $now = now()->getTimestamp();
 
             if (! $event instanceof Failed) {
-                if (! is_int($state['since'] ?? null)) {
-                    $this->cache()->forever(self::CACHE_KEY, [...$state, 'since' => $now, 'hours' => $state['hours'] ?? []]);
+                if (! isset($state['since'])) {
+                    $this->cache()->forever(self::CACHE_KEY, ['since' => $now, 'hours' => $state['hours']]);
                 }
 
                 return;
@@ -56,14 +58,14 @@ final class FailedLogins
             $hours = [];
 
             // Older hours keep only their number of addresses.
-            foreach ((array) ($state['hours'] ?? []) as $start => $counts) {
-                if (is_int($start) && $start > $this->cutoff($now) && is_array($counts)) {
+            foreach ($state['hours'] as $start => $counts) {
+                if ($start > $this->cutoff($now)) {
                     $hours[$start] = $start === $hour ? $counts : [...$counts, 'ips' => $this->ips($counts)];
                 }
             }
 
-            $counts = $hours[$hour] ?? [];
-            $ips = is_array($counts['ips'] ?? null) ? $counts['ips'] : [];
+            $counts = $hours[$hour] ?? ['failed' => 0, 'known' => 0, 'ips' => []];
+            $ips = is_array($counts['ips']) ? $counts['ips'] : [];
             $ip = $this->hashedIp();
 
             if ($ip !== null && count($ips) < self::MAX_IPS && ! in_array($ip, $ips, true)) {
@@ -71,13 +73,13 @@ final class FailedLogins
             }
 
             $hours[$hour] = [
-                'failed' => (int) ($counts['failed'] ?? 0) + 1,
-                'known' => (int) ($counts['known'] ?? 0) + ($event->user !== null ? 1 : 0),
+                'failed' => $counts['failed'] + 1,
+                'known' => $counts['known'] + ($event->user !== null ? 1 : 0),
                 'ips' => $ips,
             ];
 
             $this->cache()->forever(self::CACHE_KEY, [
-                'since' => is_int($state['since'] ?? null) ? $state['since'] : $now,
+                'since' => $state['since'] ?? $now,
                 'hours' => $hours,
             ]);
         });
@@ -91,26 +93,26 @@ final class FailedLogins
      */
     public function report(): ?array
     {
-        $state = $this->cache()->get(self::CACHE_KEY);
+        $state = self::state($this->cache()->get(self::CACHE_KEY));
 
-        if (! is_array($state) || ! is_int($state['since'] ?? null)) {
+        if (! isset($state['since'])) {
             return null;
         }
 
-        $hours = (array) ($state['hours'] ?? []);
+        $hours = $state['hours'];
         ksort($hours);
         $cutoff = $this->cutoff(now()->getTimestamp());
         $report = [];
 
         foreach ($hours as $start => $counts) {
-            if (! is_int($start) || $start <= $cutoff || ! is_array($counts) || (int) ($counts['failed'] ?? 0) <= 0) {
+            if ($start <= $cutoff || $counts['failed'] <= 0) {
                 continue;
             }
 
             $report[] = [
                 'hour' => date(DATE_ATOM, $start),
-                'failed' => (int) $counts['failed'],
-                'known' => max(0, (int) ($counts['known'] ?? 0)),
+                'failed' => $counts['failed'],
+                'known' => $counts['known'],
                 'ips' => $this->ips($counts),
             ];
         }
@@ -125,13 +127,38 @@ final class FailedLogins
     }
 
     /**
-     * @param  array<string, mixed>  $counts
+     * The cached counts as record() writes them; an hour that isn't one is
+     * left out, a count that isn't a number is 0.
+     *
+     * @return State
+     */
+    private static function state(mixed $cached): array
+    {
+        $cached = Value::array($cached);
+        $hours = [];
+
+        foreach (Value::array($cached['hours'] ?? null) as $start => $counts) {
+            if (! is_int($start) || ! is_array($counts)) {
+                continue;
+            }
+
+            $ips = $counts['ips'] ?? null;
+            $hours[$start] = [
+                'failed' => Value::int($counts['failed'] ?? null),
+                'known' => max(0, Value::int($counts['known'] ?? null)),
+                'ips' => is_array($ips) ? array_values(array_filter($ips, 'is_string')) : max(0, Value::int($ips)),
+            ];
+        }
+
+        return [...(is_int($cached['since'] ?? null) ? ['since' => $cached['since']] : []), 'hours' => $hours];
+    }
+
+    /**
+     * @param  Hour  $counts
      */
     private function ips(array $counts): int
     {
-        $ips = $counts['ips'] ?? 0;
-
-        return is_array($ips) ? count($ips) : max(0, (int) $ips);
+        return is_array($counts['ips']) ? count($counts['ips']) : $counts['ips'];
     }
 
     /**
@@ -147,7 +174,7 @@ final class FailedLogins
 
         $ip = $this->app->make('request')->ip();
 
-        return is_string($ip) && $ip !== '' ? substr(hash_hmac('sha256', $ip, (string) config('app.key')), 0, 12) : null;
+        return is_string($ip) && $ip !== '' ? substr(hash_hmac('sha256', $ip, Value::string(config('app.key'))), 0, 12) : null;
     }
 
     private function cache(): Repository

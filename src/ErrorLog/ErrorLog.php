@@ -6,6 +6,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Generator;
 use RuntimeException;
+use StackMonitor\Agent\Value;
 use Throwable;
 
 /**
@@ -91,7 +92,7 @@ final class ErrorLog
         $driver = $config['driver'] ?? null;
 
         if ($driver === 'single' || $driver === 'daily') {
-            return $config;
+            return Value::map($config);
         }
 
         if ($driver !== 'stack') {

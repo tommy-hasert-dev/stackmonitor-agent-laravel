@@ -300,6 +300,6 @@ final class NpmPackages
 
         $data = json_decode((string) @file_get_contents($path), true);
 
-        return is_array($data) ? $data : [];
+        return Value::map($data);
     }
 }

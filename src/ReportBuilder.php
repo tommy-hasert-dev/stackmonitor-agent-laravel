@@ -7,7 +7,7 @@ use StackMonitor\Agent\ErrorLog\ErrorLog;
 
 final class ReportBuilder
 {
-    public const AGENT_VERSION = '1.21.1';
+    public const AGENT_VERSION = '1.21.2';
 
     /** What composer.lock records for a package installed from packagist.org. */
     private const PACKAGIST_NOTIFICATION_URL = 'https://packagist.org/downloads/';
@@ -84,8 +84,8 @@ final class ReportBuilder
         $channels = config('logging.channels');
 
         return (new ErrorLog(
-            is_array($channels) ? $channels : [],
-            (string) config('logging.default'),
+            Value::map($channels),
+            Value::string(config('logging.default')),
             date_default_timezone_get(),
             (bool) config('stackmonitor-agent.log_messages', true),
         ))->report();
@@ -112,8 +112,8 @@ final class ReportBuilder
 
             $packages[] = [
                 'type' => 'composer',
-                'name' => (string) $package['name'],
-                'version' => (string) $package['version'],
+                'name' => Value::string($package['name']),
+                'version' => Value::string($package['version']),
                 'update_available' => null,
                 'direct' => in_array($package['name'], $direct, true),
                 'listed' => self::listed($package),
@@ -145,6 +145,6 @@ final class ReportBuilder
 
         $data = json_decode((string) file_get_contents($path), true);
 
-        return is_array($data) ? $data : [];
+        return Value::map($data);
     }
 }

@@ -222,7 +222,7 @@ repository root:
 docker compose run --rm -w /app/agents/laravel tools composer install
 docker compose run --rm -w /app/agents/laravel tools composer test         # all of the below
 docker compose run --rm -w /app/agents/laravel tools composer lint         # Pint, fixes the style
-docker compose run --rm -w /app/agents/laravel tools composer types:check  # PHPStan with Larastan, level 8
+docker compose run --rm -w /app/agents/laravel tools composer types:check  # PHPStan with Larastan, level 10
 docker compose run --rm -w /app/agents/laravel tools composer deps         # composer.json requires what the code uses
 ```
 

@@ -38,7 +38,7 @@ final class OperationalData
         $failer = $this->app->make('queue.failer');
 
         if (! $failer instanceof NullFailedJobProvider) {
-            $report['failed_jobs'] = $this->attempt(fn () => method_exists($failer, 'count') ? (int) $failer->count() : null);
+            $report['failed_jobs'] = $this->attempt(fn () => method_exists($failer, 'count') ? Value::int($failer->count()) : null);
         }
 
         $queues = $this->app->make(Queues::class);
@@ -49,7 +49,7 @@ final class OperationalData
         }
 
         // For dashboards before #134: the due jobs of the default queue.
-        if (! in_array((string) config('queue.connections.'.config('queue.default').'.driver'), ['sync', 'null'], true)) {
+        if (! in_array(Value::string(config('queue.connections.'.Value::string(config('queue.default')).'.driver')), ['sync', 'null'], true)) {
             $report['queue_pending'] = $backlog[0]['pending'] ?? null;
         }
 

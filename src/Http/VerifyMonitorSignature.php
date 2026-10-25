@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use StackMonitor\Agent\OnceStore;
 use StackMonitor\Agent\Signature;
 use StackMonitor\Agent\TestMail;
+use StackMonitor\Agent\Value;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -17,6 +18,9 @@ final class VerifyMonitorSignature
     /** The most secrets the agent takes, STACKMONITOR_AGENT_SECRET first; more are ignored. */
     private const MAX_SECRETS = 5;
 
+    /**
+     * @param  Closure(Request): Response  $next
+     */
     public function handle(Request $request, Closure $next): Response
     {
         if (! in_array($request->method(), ['GET', 'HEAD'], true)) {
@@ -30,7 +34,7 @@ final class VerifyMonitorSignature
         $timestamp = (string) $request->header('X-Monitor-Timestamp', '');
         $nonce = (string) $request->header('X-Monitor-Nonce', '');
         $signature = (string) $request->header('X-Monitor-Signature', '');
-        $maxSkew = (int) config('stackmonitor-agent.max_clock_skew', 300);
+        $maxSkew = Value::int(config('stackmonitor-agent.max_clock_skew'), 300);
         // A request for the content of one suspicious file signs its path hash along,
         // one for the PHP files of a package (#159) the package's id.
         $file = (string) $request->header('X-Monitor-File', '');

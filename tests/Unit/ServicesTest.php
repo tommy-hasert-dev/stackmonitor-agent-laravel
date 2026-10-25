@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Filesystem\FilesystemManager;
 use Illuminate\Support\Facades\Schema;
 use Opis\JsonSchema\Validator;
 use Spatie\Health\ResultStores\ResultStore;
@@ -166,6 +167,52 @@ it('reports a local disk it cannot write to', function () {
     config(['filesystems.default' => 'gone', 'filesystems.disks.gone' => ['driver' => 'local', 'root' => '/proc/stackmonitor-gone', 'throw' => true]]);
 
     expect(servicesByKey()['storage:gone']['status'])->toBe('failed');
+});
+
+it('lists a key of an S3 bucket, which the AWS SDK serves through __call', function () {
+    config(['filesystems.default' => 's3', 'filesystems.disks.s3' => ['driver' => 's3', 'bucket' => 'backups', 'root' => 'site']]);
+    $client = new class
+    {
+        public array $calls = [];
+
+        public function __call(string $method, array $arguments): mixed
+        {
+            $this->calls[] = [$method, $arguments[0]];
+
+            throw new RuntimeException('The AWS Access Key Id you provided does not exist in our records.');
+        }
+    };
+    app()->instance('filesystem', new class(app(), $client) extends FilesystemManager
+    {
+        public function __construct($app, private object $client)
+        {
+            parent::__construct($app);
+        }
+
+        public function build($config)
+        {
+            $client = $this->client;
+
+            // A missing file, as S3 answers wrong credentials too.
+            return new class($client)
+            {
+                public function __construct(private object $client) {}
+
+                public function getClient(): object
+                {
+                    return $this->client;
+                }
+
+                public function exists(string $path): bool
+                {
+                    return false;
+                }
+            };
+        }
+    });
+
+    expect(servicesByKey()['storage:s3'])->toMatchArray(['status' => 'failed', 'message' => 'The AWS Access Key Id you provided does not exist in our records.'])
+        ->and($client->calls)->toBe([['listObjectsV2', ['Bucket' => 'backups', 'MaxKeys' => 1, 'Prefix' => 'site']]]);
 });
 
 it('leaves out disks that are not set up', function () {

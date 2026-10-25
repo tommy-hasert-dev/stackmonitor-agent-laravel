@@ -158,6 +158,18 @@ it('reports the due jobs of the default queue and since when the oldest waits', 
     ]);
 });
 
+it('takes retry_after from the .env as a number and an invalid one as the default', function (mixed $retryAfter, int $expected) {
+    config(['queue.default' => 'database', 'queue.connections.database' => ['driver' => 'database', 'table' => 'jobs', 'queue' => 'default', 'retry_after' => $retryAfter]]);
+    jobsTable();
+    $now = time();
+    job('default', $now - 7200, reservedAt: $now - 4000);
+
+    expect(queuesReport()['queues'][0])->toMatchArray(['pending' => 1, 'oldest_at' => date(DATE_ATOM, $now - 4000 + $expected)]);
+})->with([
+    'string' => ['90', 90],
+    'not a number' => ['soon', 60],
+]);
+
 it('reports an empty queue without an oldest job', function () {
     config(['queue.default' => 'database', 'queue.connections.database' => ['driver' => 'database', 'table' => 'jobs', 'queue' => 'default']]);
     jobsTable();

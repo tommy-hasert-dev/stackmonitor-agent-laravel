@@ -2,6 +2,7 @@
 
 namespace StackMonitor\Agent;
 
+use DateTimeInterface;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Redis\RedisManager;
@@ -92,13 +93,13 @@ final class Services
         $default = config('database.default');
         $names = [$default];
 
-        foreach ((array) config('queue.connections') as $connection) {
+        foreach (Value::array(config('queue.connections')) as $connection) {
             if (is_array($connection) && ($connection['driver'] ?? null) === 'database') {
                 $names[] = $connection['connection'] ?? $default;
             }
         }
 
-        foreach ((array) config('cache.stores') as $store) {
+        foreach (Value::array(config('cache.stores')) as $store) {
             if (is_array($store) && ($store['driver'] ?? null) === 'database') {
                 $names[] = $store['connection'] ?? $default;
             }
@@ -107,7 +108,7 @@ final class Services
         $names[] = config('queue.failed.database');
         $names[] = config('session.driver') === 'database' ? (config('session.connection') ?? $default) : null;
 
-        return $this->existing($names, (array) config('database.connections'));
+        return $this->existing($names, Value::array(config('database.connections')));
     }
 
     /**
@@ -124,7 +125,7 @@ final class Services
             ($this->queueConnection()['driver'] ?? null) === 'redis' ? ($this->queueConnection()['connection'] ?? 'default') : null,
             config('session.driver') === 'redis' ? (config('session.connection') ?? 'default') : null,
         ];
-        $connections = array_diff_key((array) config('database.redis'), array_flip(['client', 'options', 'clusters']));
+        $connections = array_diff_key(Value::array(config('database.redis')), array_flip(['client', 'options', 'clusters']));
 
         return $this->existing($names, $connections);
     }
@@ -137,7 +138,7 @@ final class Services
      */
     private function disks(): array
     {
-        $disks = (array) config('filesystems.disks');
+        $disks = Value::array(config('filesystems.disks'));
         $names = [config('filesystems.default'), config('filesystems.cloud')];
 
         foreach ($disks as $name => $disk) {
@@ -163,7 +164,7 @@ final class Services
      */
     private function mailers(): array
     {
-        $mailers = (array) config('mail.mailers');
+        $mailers = Value::array(config('mail.mailers'));
         $default = config('mail.default');
         $config = is_string($default) ? ($mailers[$default] ?? null) : null;
 
@@ -179,7 +180,7 @@ final class Services
      */
     private function database(string $name): array
     {
-        $config = (array) config("database.connections.{$name}");
+        $config = Value::array(config("database.connections.{$name}"));
         $driver = $this->string($config['driver'] ?? null);
 
         return $this->attempt('database', $name, $driver, $config, function () use ($config, $name, $driver) {
@@ -201,11 +202,11 @@ final class Services
      */
     private function redis(string $name): array
     {
-        $redis = (array) config('database.redis');
-        $config = (array) $redis[$name];
+        $redis = Value::array(config('database.redis'));
+        $config = Value::array($redis[$name] ?? null);
 
         return $this->attempt('redis', $name, $this->string($redis['client'] ?? 'phpredis'), $config, function () use ($redis, $name, $config) {
-            $manager = new RedisManager($this->app, (string) ($redis['client'] ?? 'phpredis'), [
+            $manager = new RedisManager($this->app, Value::string($redis['client'] ?? null, 'phpredis'), [
                 ...$redis,
                 $name => [...$config, 'timeout' => self::TIMEOUT, 'read_timeout' => self::TIMEOUT, 'read_write_timeout' => self::TIMEOUT],
             ]);
@@ -270,7 +271,7 @@ final class Services
      */
     private function disk(string $name): array
     {
-        $config = (array) config("filesystems.disks.{$name}");
+        $config = Value::array(config("filesystems.disks.{$name}"));
         $driver = $this->string($config['driver'] ?? null);
 
         return $this->attempt('storage', $name, $driver, $config, function () use ($name, $config, $driver) {
@@ -289,8 +290,11 @@ final class Services
 
             // S3 takes a missing file for wrong credentials too; listing
             // one key tells them apart.
-            if ($driver === 's3' && method_exists($disk, 'getClient')) {
-                $disk->getClient()->listObjectsV2(['Bucket' => $config['bucket'], 'MaxKeys' => 1, 'Prefix' => (string) ($config['root'] ?? '')]);
+            $client = $driver === 's3' && method_exists($disk, 'getClient') ? $disk->getClient() : null;
+
+            // The AWS SDK serves its operations through __call, which method_exists() doesn't see.
+            if (is_object($client) && is_callable([$client, 'listObjectsV2'])) {
+                $client->listObjectsV2(['Bucket' => $config['bucket'], 'MaxKeys' => 1, 'Prefix' => Value::string($config['root'] ?? null)]);
 
                 return;
             }
@@ -321,7 +325,7 @@ final class Services
      */
     private function mailer(string $name): array
     {
-        $config = (array) config("mail.mailers.{$name}");
+        $config = Value::array(config("mail.mailers.{$name}"));
         $transport = $this->string($config['transport'] ?? null);
 
         if ($transport !== 'smtp') {
@@ -329,9 +333,9 @@ final class Services
         }
 
         return $this->attempt('mail', $name, $transport, $config, function () use ($config) {
-            $port = (int) ($config['port'] ?? 587);
+            $port = Value::int($config['port'] ?? null, 587);
             $tls = ($config['scheme'] ?? null) === 'smtps' || ($config['encryption'] ?? null) === 'ssl' || $port === 465;
-            SmtpProbe::ehlo((string) ($config['host'] ?? ''), $port, $tls, self::TIMEOUT);
+            SmtpProbe::ehlo(Value::string($config['host'] ?? null), $port, $tls, self::TIMEOUT);
         });
     }
 
@@ -350,34 +354,39 @@ final class Services
         }
 
         try {
-            $latest = $this->app->make($store)->latestResults();
+            $repository = $this->app->make($store);
+            $latest = is_object($repository) && method_exists($repository, 'latestResults') ? $repository->latestResults() : false;
         } catch (Throwable) {
             return null;
         }
 
-        if ($latest === null) {
-            return ['finished_at' => null, 'checks' => []];
+        if (! is_object($latest)) {
+            return $latest === null ? ['finished_at' => null, 'checks' => []] : null;
         }
 
+        $results = $latest->storedCheckResults ?? [];
+        $finished = $latest->finishedAt ?? null;
         $checks = [];
 
-        foreach ($latest->storedCheckResults as $result) {
-            $status = $this->string($result->status ?? null);
+        foreach (is_iterable($results) ? $results : [] as $result) {
+            $status = is_object($result) ? $this->string($result->status ?? null) : null;
 
-            if (! in_array($status, ['ok', 'warning', 'failed', 'crashed', 'skipped'], true)) {
+            if (! is_object($result) || ! in_array($status, ['ok', 'warning', 'failed', 'crashed', 'skipped'], true)) {
                 continue;
             }
 
+            $name = Value::string($result->name ?? null);
+            $label = Value::string($result->label ?? null);
             $checks[] = [
-                'name' => mb_substr((string) $result->name, 0, 100),
-                'label' => mb_substr((string) ($result->label ?: $result->name), 0, 100),
+                'name' => mb_substr($name, 0, 100),
+                'label' => mb_substr($label !== '' ? $label : $name, 0, 100),
                 'status' => $status,
                 'summary' => $this->clean($this->string($result->notificationMessage ?? null) ?? $this->string($result->shortSummary ?? null)),
             ];
         }
 
         return [
-            'finished_at' => $latest->finishedAt?->format(DATE_ATOM),
+            'finished_at' => $finished instanceof DateTimeInterface ? $finished->format(DATE_ATOM) : null,
             'checks' => array_slice($checks, 0, self::MAX_CHECKS),
         ];
     }
@@ -388,8 +397,8 @@ final class Services
     private function dependency(?string $driver, mixed $connection): ?string
     {
         return match ($driver) {
-            'database' => 'database:'.($connection ?? config('database.default')),
-            'redis' => 'redis:'.($connection ?? 'default'),
+            'database' => 'database:'.Value::string($connection ?? config('database.default')),
+            'redis' => 'redis:'.Value::string($connection, 'default'),
             default => null,
         };
     }
@@ -464,7 +473,7 @@ final class Services
     {
         $store = config('cache.default');
 
-        return is_string($store) ? (array) config("cache.stores.{$store}") : [];
+        return is_string($store) ? Value::map(config("cache.stores.{$store}")) : [];
     }
 
     /** @return array<string, mixed> */
@@ -472,7 +481,7 @@ final class Services
     {
         $name = config('queue.default');
 
-        return is_string($name) ? (array) config("queue.connections.{$name}") : [];
+        return is_string($name) ? Value::map(config("queue.connections.{$name}")) : [];
     }
 
     private function string(mixed $value): ?string

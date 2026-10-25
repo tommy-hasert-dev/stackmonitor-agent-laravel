@@ -89,8 +89,7 @@ final class ScheduledTasks
         $this->quietly(function () use ($event) {
             $task = $event->task;
             $id = $this->idOf($task);
-            $run = $this->cache()->get(self::CACHE_PREFIX.$id);
-            $run = is_array($run) ? $run : [];
+            $run = Value::map($this->cache()->get(self::CACHE_PREFIX.$id));
             $now = now()->getPreciseTimestamp(3) / 1000;
 
             $run = match (true) {
@@ -139,7 +138,7 @@ final class ScheduledTasks
             return null;
         }
 
-        $since = $this->cache()->get(self::SINCE_KEY);
+        $since = Value::array($this->cache()->get(self::SINCE_KEY));
         $report = [];
 
         foreach (array_slice($schedule, 0, self::MAX_TASKS, true) as $id => $task) {
@@ -156,7 +155,7 @@ final class ScheduledTasks
                 'description' => is_string($task['description'] ?? null) ? $task['description'] : null,
                 'expression' => $task['expression'],
                 'repeat_seconds' => is_int($task['repeat_seconds'] ?? null) ? $task['repeat_seconds'] : null,
-                'timezone' => is_string($task['timezone'] ?? null) ? $task['timezone'] : (string) config('app.timezone', 'UTC'),
+                'timezone' => is_string($task['timezone'] ?? null) ? $task['timezone'] : Value::string(config('app.timezone'), 'UTC'),
                 'background' => (bool) ($task['background'] ?? false),
                 'since' => is_int($since[$id] ?? null) ? date(DATE_ATOM, $since[$id]) : null,
                 'last_run' => is_float($run['started_at'] ?? null) && is_string($run['status'] ?? null) ? [
@@ -193,7 +192,7 @@ final class ScheduledTasks
                 'description' => is_string($task->description) && $task->description !== $command ? mb_substr(self::masked($task->description), 0, 500) : null,
                 'expression' => $task->getExpression(),
                 'repeat_seconds' => $task->repeatSeconds ?? null,
-                'timezone' => is_string($timezone) && $timezone !== '' ? $timezone : (string) config('app.timezone', 'UTC'),
+                'timezone' => is_string($timezone) && $timezone !== '' ? $timezone : Value::string(config('app.timezone'), 'UTC'),
                 'background' => (bool) $task->runInBackground,
             ];
         }
@@ -207,7 +206,7 @@ final class ScheduledTasks
      */
     private function finish(array $run, float $now, ?float $duration, mixed $exitCode): array
     {
-        $exitCode = is_numeric($exitCode) ? (int) $exitCode : null;
+        $exitCode = Value::int($exitCode, null);
         $duration = $duration === null ? null : max(0.0, $duration);
         $ok = $exitCode === null || $exitCode === 0;
         $durations = array_values(array_filter((array) ($run['durations'] ?? []), 'is_float'));

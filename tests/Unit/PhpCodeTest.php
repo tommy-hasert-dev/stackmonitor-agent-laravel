@@ -300,3 +300,11 @@ it('gives a package cut off before a time of its own, once per report', function
     rmdir($root.'/b');
     rmdir($root);
 });
+
+it('reads its cached results and leaves out what does not fit', function () {
+    $measured = ['fingerprint' => null, 'files' => 1, 'bytes' => 2, 'at' => 3];
+
+    expect(PhpCode::state(['a' => $measured, 'b' => ['tried' => 5], 'c' => ['files' => '1', 'at' => 3], 'd' => 'broken']))
+        ->toBe(['a' => $measured, 'b' => ['tried' => 5]])
+        ->and(PhpCode::state(null))->toBe([]);
+});

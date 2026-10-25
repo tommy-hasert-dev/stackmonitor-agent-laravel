@@ -97,6 +97,27 @@ it('measures again once a day, and a failed measurement after an hour', function
         ->and(DatabaseSize::due($failed, DATABASE_NOW + DatabaseSize::MEASURE_AFTER + DatabaseSize::RETRY_AFTER))->toBeTrue();
 });
 
+it('reads its cached state and leaves out what does not fit', function () {
+    $result = ['measured_at' => '2026-10-04T08:00:00+00:00', 'engine' => 'mysql', 'source' => 'information_schema', 'size' => 10, 'table_count' => 1, 'tables' => [
+        ['name' => 'users', 'size' => 10, 'rows' => 2],
+        ['name' => 'broken', 'size' => '10', 'rows' => null],
+    ]];
+
+    expect(DatabaseSize::state(['attempted_at' => DATABASE_NOW, 'failed' => false, 'result' => $result]))->toBe([
+        'attempted_at' => DATABASE_NOW,
+        'failed' => false,
+        'result' => [...$result, 'tables' => [['name' => 'users', 'size' => 10, 'rows' => 2]]],
+    ])
+        ->and(DatabaseSize::state(['attempted_at' => (string) DATABASE_NOW, 'result' => ['size' => 1]]))->toBe([])
+        ->and(DatabaseSize::state('broken'))->toBe([]);
+});
+
+it('takes a row count the server does not know as unknown', function () {
+    $report = DatabaseSize::mysql(databaseQuery([['TABLE_NAME' => 'users', 'DATA_LENGTH' => '16384', 'INDEX_LENGTH' => 'n/a', 'TABLE_ROWS' => 'n/a']], null), DATABASE_NOW);
+
+    expect($report['tables'])->toBe([['name' => 'users', 'size' => 16384, 'rows' => null]]);
+});
+
 it('measures a SQLite database by its file, with the tables from dbstat', function () {
     $path = databaseFile();
     Schema::create('posts', function (Blueprint $table) {

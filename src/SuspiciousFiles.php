@@ -24,6 +24,11 @@ use Illuminate\Contracts\Foundation\Application;
  * large folder is looked through over several reports, which send the last
  * complete result meanwhile, kept in the app's cache. A new scan starts once
  * that is RESCAN_AFTER old.
+ *
+ * @phpstan-type File array{path: string, kind: string, size: int, modified_at: string|null, abs?: string}
+ * @phpstan-type Run array{queue: list<array{0: string, 1: string}>, scanned: int, total: int, files: list<File>}
+ * @phpstan-type Last array{scanned_at: int, scanned: int, total: int, files: list<File>}
+ * @phpstan-type State array{run?: Run, last?: Last}
  */
 final class SuspiciousFiles
 {
@@ -66,9 +71,8 @@ final class SuspiciousFiles
      */
     public function report(): ?array
     {
-        $state = $this->cache()->get(self::CACHE_KEY);
         $state = self::scan(
-            is_array($state) ? $state : [],
+            self::state($this->cache()->get(self::CACHE_KEY)),
             $this->roots(),
             $this->basePath ?? $this->app->basePath(),
             now()->getTimestamp(),
@@ -79,6 +83,60 @@ final class SuspiciousFiles
         $this->cache()->forever(self::CACHE_KEY, $state);
 
         return self::forReport($state, filter_var(config('stackmonitor-agent.file_contents'), FILTER_VALIDATE_BOOL));
+    }
+
+    /**
+     * The cached state as scan() writes it. A scan in progress that doesn't
+     * fit starts again, a last result that doesn't fit counts as none; a
+     * file that doesn't fit is left out.
+     *
+     * @return State
+     */
+    public static function state(mixed $cached): array
+    {
+        $cached = Value::array($cached);
+        $run = Value::array($cached['run'] ?? null);
+        $last = Value::array($cached['last'] ?? null);
+        $state = [];
+
+        if (is_array($run['queue'] ?? null) && is_int($run['scanned'] ?? null) && is_int($run['total'] ?? null)) {
+            $queue = [];
+
+            foreach ($run['queue'] as $entry) {
+                if (is_array($entry) && is_string($entry[0] ?? null) && is_string($entry[1] ?? null)) {
+                    $queue[] = [$entry[0], $entry[1]];
+                }
+            }
+
+            $state['run'] = ['queue' => $queue, 'scanned' => $run['scanned'], 'total' => $run['total'], 'files' => self::files($run['files'] ?? null)];
+        }
+
+        if (is_int($last['scanned_at'] ?? null) && is_int($last['scanned'] ?? null) && is_int($last['total'] ?? null)) {
+            $state['last'] = ['scanned_at' => $last['scanned_at'], 'scanned' => $last['scanned'], 'total' => $last['total'], 'files' => self::files($last['files'] ?? null)];
+        }
+
+        return $state;
+    }
+
+    /**
+     * @return list<File>
+     */
+    private static function files(mixed $files): array
+    {
+        $kept = [];
+
+        foreach (Value::array($files) as $file) {
+            $modified = is_array($file) ? ($file['modified_at'] ?? null) : null;
+
+            if (is_array($file) && is_string($file['path'] ?? null) && is_string($file['kind'] ?? null) && is_int($file['size'] ?? null)
+                && ($modified === null || is_string($modified))) {
+                // A scan before #188 kept no `abs`; such a file is reported but can't be read.
+                $kept[] = ['path' => $file['path'], 'kind' => $file['kind'], 'size' => $file['size'], 'modified_at' => $modified,
+                    ...(is_string($file['abs'] ?? null) ? ['abs' => $file['abs']] : [])];
+            }
+        }
+
+        return $kept;
     }
 
     /**
@@ -108,19 +166,19 @@ final class SuspiciousFiles
      * RESCAN_AFTER old, until the queue is empty or a limit is reached; a
      * finished scan becomes the last result.
      *
-     * @param  array<string, mixed>  $state  as cached
+     * @param  State  $state  as state() reads it
      * @param  list<string>  $roots  the folders to look through
      * @param  string  $base  paths are reported relative to it
-     * @return array<string, mixed>
+     * @return State
      */
     public static function scan(array $state, array $roots, string $base, int $now, int $maxEntries, float $deadline): array
     {
-        $run = is_array($state['run'] ?? null) ? $state['run'] : null;
+        $run = $state['run'] ?? null;
 
         if ($run === null) {
-            $last = is_array($state['last'] ?? null) ? $state['last'] : null;
+            $last = $state['last'] ?? null;
 
-            if ($last !== null && $now - (int) $last['scanned_at'] < self::RESCAN_AFTER) {
+            if ($last !== null && $now - $last['scanned_at'] < self::RESCAN_AFTER) {
                 return $state;
             }
 
@@ -194,30 +252,27 @@ final class SuspiciousFiles
      * scan was complete. `contents` says whether the dashboard may ask for
      * the start of a file.
      *
-     * @param  array<string, mixed>  $state
+     * @param  State  $state
      * @return array{scanned_at: string, scanned: int, total: int, contents: bool, files: list<array{path: string, kind: string, size: int, modified_at: string|null}>}|null
      */
     public static function forReport(array $state, bool $contents = false): ?array
     {
         $last = $state['last'] ?? null;
 
-        if (! is_array($last)) {
+        if ($last === null) {
             return null;
         }
 
-        /** @var array<array{path: string, kind: string, size: int, modified_at: string|null, abs?: string}> $files as the scan keeps them */
-        $files = (array) $last['files'];
-
         return [
-            'scanned_at' => gmdate(DATE_ATOM, (int) $last['scanned_at']),
-            'scanned' => (int) $last['scanned'],
-            'total' => (int) $last['total'],
+            'scanned_at' => gmdate(DATE_ATOM, $last['scanned_at']),
+            'scanned' => $last['scanned'],
+            'total' => $last['total'],
             'contents' => $contents,
-            'files' => array_values(array_map(function (array $file) {
+            'files' => array_map(function (array $file) {
                 unset($file['abs']);
 
                 return $file;
-            }, $files)),
+            }, $last['files']),
         ];
     }
 
@@ -230,9 +285,7 @@ final class SuspiciousFiles
      */
     public function content(string $pathHash): ?array
     {
-        $state = $this->cache()->get(self::CACHE_KEY);
-
-        return self::read(is_array($state) ? $state : [], $pathHash, $this->roots(), self::MAX_CONTENT_BYTES);
+        return self::read(self::state($this->cache()->get(self::CACHE_KEY)), $pathHash, $this->roots(), self::MAX_CONTENT_BYTES);
     }
 
     /**
@@ -240,7 +293,7 @@ final class SuspiciousFiles
      * it is in the last complete scan, still no link, inside one of $roots
      * and of the size and date the scan saw. The content goes out as base64.
      *
-     * @param  array<string, mixed>  $state  as cached
+     * @param  State  $state
      * @param  list<string>  $roots
      * @return array{path_hash: string, size: int, sha256: string, truncated: bool, content: string}|null
      */
@@ -248,8 +301,8 @@ final class SuspiciousFiles
     {
         $file = null;
 
-        foreach ((array) ($state['last']['files'] ?? []) as $candidate) {
-            if (is_array($candidate) && is_string($candidate['path'] ?? null) && hash_equals(hash('sha256', $candidate['path']), $pathHash)) {
+        foreach ($state['last']['files'] ?? [] as $candidate) {
+            if (hash_equals(hash('sha256', $candidate['path']), $pathHash)) {
                 $file = $candidate;
                 break;
             }
@@ -279,7 +332,7 @@ final class SuspiciousFiles
             $real = realpath($path);
             $now = is_string($real) ? @stat($real) : false;
 
-            if (! is_array($stat) || $stat['size'] !== ($file['size'] ?? null) || $stat['mtime'] !== $stored
+            if (! is_array($stat) || $stat['size'] !== $file['size'] || $stat['mtime'] !== $stored
                 || ! is_array($now) || $now['dev'] !== $stat['dev'] || $now['ino'] !== $stat['ino'] || ! self::inside($path, $roots)) {
                 return null;
             }
