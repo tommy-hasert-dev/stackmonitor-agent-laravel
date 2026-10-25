@@ -267,20 +267,16 @@ final class PhpCode
                     return ['files' => $files, 'bytes' => $bytes, 'entries' => null];
                 }
 
-                if ($entries !== null) {
-                    $entries[] = [
-                        'path' => substr($path, strlen($root) + 1),
-                        'abs' => $path,
-                        'size' => is_int($size) ? $size : 0,
-                        'mtime' => is_int($mtime) ? $mtime : 0,
-                    ];
-                }
+                $entries[] = [
+                    'path' => substr($path, strlen($root) + 1),
+                    'abs' => $path,
+                    'size' => is_int($size) ? $size : 0,
+                    'mtime' => is_int($mtime) ? $mtime : 0,
+                ];
             }
         }
 
-        if ($entries !== null) {
-            usort($entries, fn (array $a, array $b) => strcmp($a['path'], $b['path']));
-        }
+        usort($entries, fn (array $a, array $b) => strcmp($a['path'], $b['path']));
 
         return ['files' => $files, 'bytes' => $bytes, 'entries' => $entries];
     }
@@ -400,6 +396,6 @@ final class PhpCode
 
     private function cache(): Repository
     {
-        return $this->app['cache']->store();
+        return $this->app->make('cache')->store();
     }
 }

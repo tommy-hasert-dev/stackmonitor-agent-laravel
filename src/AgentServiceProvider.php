@@ -63,7 +63,7 @@ final class AgentServiceProvider extends ServiceProvider
         // The last run of every scheduled task (#138).
         Event::listen(
             [ScheduledTaskStarting::class, ScheduledTaskFinished::class, ScheduledTaskFailed::class, ScheduledTaskSkipped::class, ScheduledBackgroundTaskFinished::class],
-            fn (object $event) => $this->app->make(ScheduledTasks::class)->record($event),
+            fn (ScheduledTaskStarting|ScheduledTaskFinished|ScheduledBackgroundTaskFinished|ScheduledTaskFailed|ScheduledTaskSkipped $event) => $this->app->make(ScheduledTasks::class)->record($event),
         );
 
         // Failed logins per hour, once the app logs in with Laravel's auth (#145).

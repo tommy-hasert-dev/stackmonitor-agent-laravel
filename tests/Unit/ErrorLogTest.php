@@ -184,7 +184,7 @@ it('reads a big log in blocks, not all at once', function () {
 
     expect($report['errors'])->toBe(20_000)
         ->and(memory_get_peak_usage() - $before)->toBeLessThan(ErrorLog::READ_LIMIT / 4);
-});
+})->skip(PHP_VERSION_ID < 80200, 'memory_reset_peak_usage() needs PHP 8.2');
 
 it('leaves the messages out when they are switched off', function () {
     file_put_contents($this->dir.'/laravel.log', logLine(100, 'ERROR', 'Boom'));

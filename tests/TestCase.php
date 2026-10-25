@@ -22,6 +22,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('stackmonitor-agent.secret', self::SECRET);
         $app['config']->set('app.debug', false);
         $app['config']->set('cache.default', 'array');
+        // Testbench 9 and later pick it by themselves, Testbench 8 (Laravel 10) would use MySQL.
+        $app['config']->set('database.default', 'testing');
     }
 
     protected function setUp(): void

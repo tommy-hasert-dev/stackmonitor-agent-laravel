@@ -85,7 +85,7 @@ final class Queues
         $masters = $this->app->make(self::MASTERS)->all();
         $paused = array_filter($masters, fn (object $master) => ($master->status ?? null) === 'paused');
         $supervisors = array_map(fn (object $supervisor) => [
-            'name' => mb_substr((string) $supervisor->name, 0, 200),
+            'name' => mb_substr((string) ($supervisor->name ?? ''), 0, 200),
             'status' => ($supervisor->status ?? null) === 'paused' ? 'paused' : 'running',
             'processes' => (int) array_sum(array_map('intval', (array) ($supervisor->processes ?? []))),
         ], $this->supervisors());
@@ -113,7 +113,7 @@ final class Queues
      */
     private function backlog(string $connection, string $name): array
     {
-        $queue = $this->app['queue']->connection($connection);
+        $queue = $this->app->make('queue')->connection($connection);
         $now = time();
 
         if ($queue instanceof DatabaseQueue) {
@@ -127,15 +127,20 @@ final class Queues
                 ->selectRaw('count(*) as pending, min(case when reserved_at is null then available_at else reserved_at + ? end) as oldest', [$retryAfter])
                 ->first();
 
-            return [(int) $row->pending, $row->oldest === null ? null : (int) $row->oldest];
+            $oldest = $row->oldest ?? null;
+
+            return [(int) ($row->pending ?? 0), $oldest === null ? null : (int) $oldest];
         }
 
         if ($queue instanceof RedisQueue) {
             return $this->redis($queue, $name, $now);
         }
 
+        // Both came with a release of Laravel 11.
         return [
+            // @phpstan-ignore function.alreadyNarrowedType
             method_exists($queue, 'pendingSize') ? (int) $queue->pendingSize($name) : null,
+            // @phpstan-ignore function.alreadyNarrowedType
             method_exists($queue, 'creationTimeOfOldestPendingJob') ? $this->timestamp($queue->creationTimeOfOldestPendingJob($name)) : null,
         ];
     }
@@ -152,6 +157,7 @@ final class Queues
      */
     private function redis(RedisQueue $queue, string $name, int $now): array
     {
+        // @phpstan-ignore function.alreadyNarrowedType (older Laravel lacks it)
         $key = method_exists($queue, 'getQueueRedisKey')
             ? (fn () => $this->getQueueRedisKey($name))->call($queue)
             : $queue->getQueue($name);

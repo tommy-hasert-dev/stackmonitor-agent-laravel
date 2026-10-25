@@ -3,6 +3,7 @@
 namespace StackMonitor\Agent;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Queue\Failed\FailedJobProviderInterface;
 use Illuminate\Queue\Failed\NullFailedJobProvider;
 use Throwable;
 
@@ -33,7 +34,8 @@ final class OperationalData
     public function report(): array
     {
         $report = [];
-        $failer = $this->app['queue.failer'];
+        /** @var FailedJobProviderInterface $failer whichever the app configured */
+        $failer = $this->app->make('queue.failer');
 
         if (! $failer instanceof NullFailedJobProvider) {
             $report['failed_jobs'] = $this->attempt(fn () => method_exists($failer, 'count') ? (int) $failer->count() : null);
@@ -121,7 +123,7 @@ final class OperationalData
      */
     private function migrationsPending(): ?int
     {
-        $migrator = $this->app['migrator'];
+        $migrator = $this->app->make('migrator');
 
         if (! $migrator->repositoryExists()) {
             return null;

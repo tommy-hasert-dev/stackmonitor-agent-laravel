@@ -205,15 +205,19 @@ final class SuspiciousFiles
             return null;
         }
 
+        /** @var array<array{path: string, kind: string, size: int, modified_at: string|null, abs?: string}> $files as the scan keeps them */
+        $files = (array) $last['files'];
+
         return [
             'scanned_at' => gmdate(DATE_ATOM, (int) $last['scanned_at']),
             'scanned' => (int) $last['scanned'],
             'total' => (int) $last['total'],
             'contents' => $contents,
-            'files' => array_values(array_map(
-                fn (array $file) => array_diff_key($file, ['abs' => true]),
-                (array) $last['files'],
-            )),
+            'files' => array_values(array_map(function (array $file) {
+                unset($file['abs']);
+
+                return $file;
+            }, $files)),
         ];
     }
 
@@ -307,6 +311,8 @@ final class SuspiciousFiles
      * folder swapped for a link since the scan leads elsewhere.
      *
      * @param  list<string>  $roots
+     *
+     * @phpstan-impure the answer changes with the filesystem
      */
     private static function inside(string $path, array $roots): bool
     {
@@ -396,6 +402,6 @@ final class SuspiciousFiles
 
     private function cache(): Repository
     {
-        return $this->app['cache']->store();
+        return $this->app->make('cache')->store();
     }
 }

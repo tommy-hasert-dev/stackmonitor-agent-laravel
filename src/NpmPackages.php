@@ -180,6 +180,7 @@ final class NpmPackages
             }
         }
 
+        /** @var list<array{string, string, bool}> $entries only the dev flag changed after adding */
         return $entries;
     }
 

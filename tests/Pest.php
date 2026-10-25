@@ -3,5 +3,6 @@
 use StackMonitor\Agent\Tests\EmptyPathTestCase;
 use StackMonitor\Agent\Tests\TestCase;
 
-pest()->extend(TestCase::class)->in('Feature', 'Unit');
-pest()->extend(EmptyPathTestCase::class)->in('EmptyPath');
+// uses() rather than pest()->extend(): Pest 2, for PHP 8.1, doesn't have pest() yet.
+uses(TestCase::class)->in('Feature', 'Unit');
+uses(EmptyPathTestCase::class)->in('EmptyPath');

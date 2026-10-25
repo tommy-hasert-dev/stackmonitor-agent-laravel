@@ -1,0 +1,16 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - config/
+        - routes/
+        - src/
+
+    level: 8
+
+    ignoreErrors:
+        # Larastan only knows the app's config folder, not the package's.
+        -
+            identifier: larastan.noEnvCallsOutsideOfConfig
+            path: config/stackmonitor-agent.php

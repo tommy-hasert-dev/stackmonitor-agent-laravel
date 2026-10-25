@@ -209,7 +209,8 @@ final class ErrorLog
         }
 
         try {
-            $size = (int) fstat($handle)['size'];
+            $stat = fstat($handle);
+            $size = $stat === false ? 0 : $stat['size'];
             $start = $size - min($size, $budget);
             $budget -= $size - $start;
             $partial = $start > 0;
@@ -221,7 +222,7 @@ final class ErrorLog
                 $length = min(self::BLOCK, $position - $start);
                 $position -= $length;
                 fseek($handle, $position);
-                $lines = explode("\n", fread($handle, $length).$carry);
+                $lines = explode("\n", fread($handle, max(1, $length)).$carry);
                 $carry = (string) array_shift($lines);
 
                 for ($i = count($lines) - 1; $i >= 0; $i--) {

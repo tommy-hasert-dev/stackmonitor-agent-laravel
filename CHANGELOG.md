@@ -5,6 +5,17 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.21.1] - 2026-10-25
+
+### Changed
+
+- Requires `laravel/framework` 10 to 13 instead of five `illuminate/*`
+  packages: the agent uses more of Laravel than those, such as its
+  foundation, which only comes with the framework. Nothing changes for an
+  app, every Laravel app has it.
+- Tested on every PHP and Laravel version it supports, PHP 8.1 to 8.5
+  with Laravel 10 to 13, each with the oldest and the newest releases.
+
 ## [1.21.0] - 2026-10-23
 
 ### Added

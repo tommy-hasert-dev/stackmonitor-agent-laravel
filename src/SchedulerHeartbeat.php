@@ -24,7 +24,7 @@ final class SchedulerHeartbeat
     public function record(): void
     {
         try {
-            $this->app['cache']->forever(self::CACHE_KEY, [
+            $this->app->make('cache')->forever(self::CACHE_KEY, [
                 'at' => now()->getTimestamp(),
                 'tasks' => count($this->app->make(Schedule::class)->events()),
             ]);
@@ -38,7 +38,7 @@ final class SchedulerHeartbeat
      */
     public function report(): ?array
     {
-        $run = $this->app['cache']->get(self::CACHE_KEY);
+        $run = $this->app->make('cache')->get(self::CACHE_KEY);
 
         if (! is_array($run) || ! is_int($run['at'] ?? null) || ! is_int($run['tasks'] ?? null)) {
             return null;

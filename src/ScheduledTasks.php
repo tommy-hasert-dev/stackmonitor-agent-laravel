@@ -84,7 +84,7 @@ final class ScheduledTasks
      * Keeps what the scheduler reports about one task. A broken cache must
      * never stop the app's own tasks, so it fails silently.
      */
-    public function record(object $event): void
+    public function record(ScheduledTaskStarting|ScheduledTaskFinished|ScheduledBackgroundTaskFinished|ScheduledTaskFailed|ScheduledTaskSkipped $event): void
     {
         $this->quietly(function () use ($event) {
             $task = $event->task;
@@ -112,8 +112,8 @@ final class ScheduledTasks
                     'status' => 'failed',
                     'error' => self::error($event->exception),
                 ],
-                $event instanceof ScheduledTaskSkipped => [...$run, 'skipped_at' => $now],
-                default => null,
+                // ScheduledTaskSkipped
+                default => [...$run, 'skipped_at' => $now],
             };
 
             if ($run !== null) {
@@ -192,7 +192,7 @@ final class ScheduledTasks
                 'command' => mb_substr(self::masked($command), 0, 2000),
                 'description' => is_string($task->description) && $task->description !== $command ? mb_substr(self::masked($task->description), 0, 500) : null,
                 'expression' => $task->getExpression(),
-                'repeat_seconds' => isset($task->repeatSeconds) && is_int($task->repeatSeconds) ? $task->repeatSeconds : null,
+                'repeat_seconds' => $task->repeatSeconds ?? null,
                 'timezone' => is_string($timezone) && $timezone !== '' ? $timezone : (string) config('app.timezone', 'UTC'),
                 'background' => (bool) $task->runInBackground,
             ];
@@ -326,7 +326,7 @@ final class ScheduledTasks
 
     private function cache(): Repository
     {
-        return $this->app['cache']->store();
+        return $this->app->make('cache')->store();
     }
 
     private function quietly(callable $write): void

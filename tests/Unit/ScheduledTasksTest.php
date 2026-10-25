@@ -6,6 +6,7 @@ use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskSkipped;
 use Illuminate\Console\Events\ScheduledTaskStarting;
+use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Opis\JsonSchema\Validator;
 use StackMonitor\Agent\ScheduledTasks;
@@ -94,7 +95,7 @@ it('reports the tasks schedule:run saw, when only the console kernel registers t
         ])
         ->and($tasks[1])->toMatchArray(['command' => 'Bereinigen', 'repeat_seconds' => 30])
         ->and($tasks[2])->toMatchArray(['command' => 'rm -rf /tmp/cache', 'background' => true]);
-});
+})->skip(! method_exists(Event::class, 'everyThirtySeconds'), 'tasks below a minute came with a later Laravel 10');
 
 it('reports the runs of tasks only the console kernel registers', function () {
     $task = app(Schedule::class)->command('inspire')->hourly();

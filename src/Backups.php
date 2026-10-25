@@ -41,7 +41,7 @@ final class Backups
             }
 
             try {
-                $storage = $this->app['filesystem']->disk($disk);
+                $storage = $this->app->make('filesystem')->disk($disk);
 
                 // spatie's own test for a backup: a zip in the folder named after the app.
                 foreach ($storage->allFiles($name) as $file) {

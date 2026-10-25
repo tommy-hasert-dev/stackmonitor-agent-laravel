@@ -41,7 +41,7 @@ it('counts the failed jobs', function () {
     app()->instance('queue.failer', $failer);
 
     expect(operationalData()['failed_jobs'])->toBe(2);
-});
+})->skip(! class_exists(FileFailedJobProvider::class), 'FileFailedJobProvider came with a later Laravel 10');
 
 it('leaves out failed jobs when they are not stored', function () {
     expect(operationalData())->not->toHaveKey('failed_jobs');

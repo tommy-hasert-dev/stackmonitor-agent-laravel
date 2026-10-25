@@ -145,14 +145,14 @@ final class FailedLogins
             return null;
         }
 
-        $ip = $this->app['request']->ip();
+        $ip = $this->app->make('request')->ip();
 
         return is_string($ip) && $ip !== '' ? substr(hash_hmac('sha256', $ip, (string) config('app.key')), 0, 12) : null;
     }
 
     private function cache(): Repository
     {
-        return $this->app['cache']->store();
+        return $this->app->make('cache')->store();
     }
 
     private function quietly(callable $write): void

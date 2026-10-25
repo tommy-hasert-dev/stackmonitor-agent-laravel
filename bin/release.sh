@@ -59,6 +59,27 @@ if [ -n "$(git ls-remote --tags "${SPLIT_REMOTE}" "refs/tags/v${VERSION}")" ]; t
   exit 1
 fi
 
+# The local checks only see the newest PHP and Laravel; the workflow tests every version the
+# agent promises (#93). Its run for main, or for the last commit that changed what it checks.
+CHECKED="$(git log -1 --format=%H -- "${PREFIX}" schema .github/workflows/laravel-agent.yml)"
+RUN=""
+for SHA in "$(git rev-parse HEAD)" "${CHECKED}"; do
+  RUN="$(gh run list --workflow laravel-agent.yml --commit "${SHA}" --limit 1 --json status,conclusion,url \
+    --jq '.[0] | select(.) | "\(.status)|\(.conclusion)|\(.url)"')"
+  [ -n "${RUN}" ] && break
+done
+if [ -z "${RUN}" ]; then
+  echo "No run of the workflow \"Laravel agent\" for this commit; start one with" >&2
+  echo "  gh workflow run laravel-agent.yml --ref main" >&2
+  exit 1
+fi
+IFS="|" read -r RUN_STATUS RUN_CONCLUSION RUN_URL <<<"${RUN}"
+if [ "${RUN_STATUS}" != "completed" ] || [ "${RUN_CONCLUSION}" != "success" ]; then
+  echo "The workflow \"Laravel agent\" is ${RUN_STATUS} (${RUN_CONCLUSION:-no result}): ${RUN_URL}" >&2
+  exit 1
+fi
+echo "==> Workflow \"Laravel agent\" passed: ${RUN_URL}"
+
 echo "==> Running the agent's checks (tools container)"
 # Without -T and </dev/null the container eats stdin, and an answer piped in for
 # the prompt below (echo y | release.sh ...) never reaches `read`.

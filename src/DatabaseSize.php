@@ -56,7 +56,10 @@ final class DatabaseSize
             $this->cache()->forever(self::CACHE_KEY, $state);
         }
 
-        return is_array($state['result'] ?? null) ? $state['result'] : null;
+        /** @var array{measured_at: string, engine: string, source: string, size: int, table_count: int, tables: list<array{name: string, size: int, rows: int|null}>}|null $result as remember() keeps it */
+        $result = is_array($state['result'] ?? null) ? $state['result'] : null;
+
+        return $result;
     }
 
     /**
@@ -98,7 +101,7 @@ final class DatabaseSize
      * TABLE STATUS` when that fails or shows none (some hosts close it off);
      * null when both fail.
      *
-     * @param  callable(string): (list<array<string, mixed>>|null)  $query  null for a failing query
+     * @param  callable(string): (array<array<array-key, mixed>>|null)  $query  null for a failing query
      * @return array{measured_at: string, engine: string, source: string, size: int, table_count: int, tables: list<array{name: string, size: int, rows: int|null}>}|null
      */
     public static function mysql(callable $query, int $now): ?array
@@ -151,7 +154,7 @@ final class DatabaseSize
      * The rows of either query as tables, whatever case the server gives the
      * column names in; a size the server doesn't know counts as 0.
      *
-     * @param  iterable<array<string, mixed>>  $rows
+     * @param  iterable<array<array-key, mixed>>  $rows
      * @return list<array{name: string, size: int, rows: int|null}>
      */
     private static function tables(iterable $rows, string $name, string $data, string $index, string $count): array
@@ -186,7 +189,7 @@ final class DatabaseSize
     private function measure(int $now): ?array
     {
         try {
-            $connection = $this->app['db']->connection();
+            $connection = $this->app->make('db')->connection();
 
             return match ($connection->getDriverName()) {
                 'mysql', 'mariadb' => self::mysql(function (string $sql) use ($connection) {
@@ -229,13 +232,13 @@ final class DatabaseSize
             $rows = [];
         }
 
-        $tables = array_map(fn ($row) => ['name' => mb_substr((string) $row->name, 0, 200), 'size' => (int) $row->size, 'rows' => null], $rows);
+        $tables = array_values(array_map(fn ($row) => ['name' => mb_substr((string) $row->name, 0, 200), 'size' => (int) $row->size, 'rows' => null], $rows));
 
         return self::forReport('sqlite', 'file', $now, $tables, $size, $tableCount);
     }
 
     private function cache(): Repository
     {
-        return $this->app['cache']->store();
+        return $this->app->make('cache')->store();
     }
 }

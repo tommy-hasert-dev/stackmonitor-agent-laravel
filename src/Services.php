@@ -22,6 +22,8 @@ use Throwable;
  * A service whose connection already failed is skipped. The last results of
  * spatie/laravel-health come along when the app has it. Messages leave out
  * the credentials from the config.
+ *
+ * @phpstan-type Check array{key: string, type: string, name: string, driver: string|null, status: string, duration_ms: int|null, message: string|null, depends_on: string|null}
  */
 final class Services
 {
@@ -48,7 +50,7 @@ final class Services
     }
 
     /**
-     * @return array{checks: list<array{key: string, type: string, name: string, driver: string|null, status: string, duration_ms: int|null, message: string|null, depends_on: string|null}>, health: array{finished_at: string|null, checks: list<array{name: string, label: string, status: string, summary: string|null}>}|null}
+     * @return array{checks: list<Check>, health: array{finished_at: string|null, checks: list<array{name: string, label: string, status: string, summary: string|null}>}|null}
      */
     public function report(): array
     {
@@ -172,6 +174,9 @@ final class Services
         return $this->existing([$default], $mailers);
     }
 
+    /**
+     * @return Check
+     */
     private function database(string $name): array
     {
         $config = (array) config("database.connections.{$name}");
@@ -185,12 +190,15 @@ final class Services
                 default => $config,
             };
             // A connection of its own, so the timeout doesn't change the app's.
-            $connection = $this->app['db.factory']->make($config, $name);
+            $connection = $this->app->make('db.factory')->make($config, $name);
             $connection->select('select 1');
             $connection->disconnect();
         });
     }
 
+    /**
+     * @return Check
+     */
     private function redis(string $name): array
     {
         $redis = (array) config('database.redis');
@@ -202,12 +210,15 @@ final class Services
                 $name => [...$config, 'timeout' => self::TIMEOUT, 'read_timeout' => self::TIMEOUT, 'read_write_timeout' => self::TIMEOUT],
             ]);
             $manager->connection($name)->command('ping');
+            // @phpstan-ignore method.notFound (PhpRedis has it, Predis passes it on to its client)
             $manager->connection($name)->disconnect();
         });
     }
 
     /**
      * The default store; one that keeps nothing (array, null) has nothing to check.
+     *
+     * @return Check|null
      */
     private function cache(): ?array
     {
@@ -220,7 +231,7 @@ final class Services
         }
 
         return $this->attempt('cache', $store, $driver, $config, function () use ($store) {
-            $cache = $this->app['cache']->store($store);
+            $cache = $this->app->make('cache')->store($store);
             $key = self::PREFIX.bin2hex(random_bytes(8));
             $value = bin2hex(random_bytes(8));
 
@@ -238,6 +249,8 @@ final class Services
 
     /**
      * The default queue by its size; sync and null have no connection.
+     *
+     * @return Check|null
      */
     private function queue(): ?array
     {
@@ -249,9 +262,12 @@ final class Services
             return null;
         }
 
-        return $this->attempt('queue', $name, $driver, $config, fn () => $this->app['queue']->connection($name)->size(), $this->dependency($driver, $config['connection'] ?? null));
+        return $this->attempt('queue', $name, $driver, $config, fn () => $this->app->make('queue')->connection($name)->size(), $this->dependency($driver, $config['connection'] ?? null));
     }
 
+    /**
+     * @return Check
+     */
     private function disk(string $name): array
     {
         $config = (array) config("filesystems.disks.{$name}");
@@ -259,7 +275,7 @@ final class Services
 
         return $this->attempt('storage', $name, $driver, $config, function () use ($name, $config, $driver) {
             if ($driver === 'local' && ! ($config['read-only'] ?? false)) {
-                $this->writeAndRead($this->app['filesystem']->disk($name));
+                $this->writeAndRead($this->app->make('filesystem')->disk($name));
 
                 return;
             }
@@ -269,7 +285,7 @@ final class Services
                 'ftp', 'sftp' => [...$config, 'timeout' => self::TIMEOUT],
                 default => $config,
             };
-            $disk = $this->app['filesystem']->build($config);
+            $disk = $this->app->make('filesystem')->build($config);
 
             // S3 takes a missing file for wrong credentials too; listing
             // one key tells them apart.
@@ -300,6 +316,8 @@ final class Services
     /**
      * SMTP up to EHLO, without logging in or sending; the other transports
      * (Mailgun, Postmark, SES, sendmail, log …) are only named.
+     *
+     * @return Check
      */
     private function mailer(string $name): array
     {
@@ -379,6 +397,7 @@ final class Services
     /**
      * @param  array<array-key, mixed>  $config
      * @param  callable(): mixed  $check
+     * @return Check
      */
     private function attempt(string $type, string $name, ?string $driver, array $config, callable $check, ?string $dependsOn = null): array
     {
@@ -398,6 +417,9 @@ final class Services
         }
     }
 
+    /**
+     * @return Check
+     */
     private function result(string $type, string $name, ?string $driver, string $status, ?int $started = null, ?string $message = null, ?string $dependsOn = null): array
     {
         $key = "{$type}:{$name}";

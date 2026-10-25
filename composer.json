@@ -6,17 +6,15 @@
     "keywords": ["laravel", "monitoring", "stackmonitor"],
     "require": {
         "php": "^8.1",
-        "illuminate/cache": "^10.0|^11.0|^12.0|^13.0",
-        "illuminate/contracts": "^10.0|^11.0|^12.0|^13.0",
-        "illuminate/http": "^10.0|^11.0|^12.0|^13.0",
-        "illuminate/routing": "^10.0|^11.0|^12.0|^13.0",
-        "illuminate/support": "^10.0|^11.0|^12.0|^13.0"
+        "laravel/framework": "^10.0|^11.0|^12.0|^13.0"
     },
     "require-dev": {
+        "larastan/larastan": "^2.11|^3.13",
         "laravel/pint": "^1.32.1",
         "opis/json-schema": "^2.6",
-        "orchestra/testbench": "^11.3",
-        "pestphp/pest": "^5.2.1"
+        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+        "pestphp/pest": "^2.36|^3.8|^4.1|^5.2.1",
+        "shipmonk/composer-dependency-analyser": "^1.8"
     },
     "autoload": {
         "psr-4": { "StackMonitor\\Agent\\": "src/" }
@@ -29,7 +27,9 @@
     },
     "scripts": {
         "lint": "pint",
-        "test": ["pint --test", "pest"]
+        "types:check": "phpstan analyse --no-progress --memory-limit=1G",
+        "deps": "composer-dependency-analyser",
+        "test": ["pint --test", "@types:check", "@deps", "pest"]
     },
     "config": {
         "sort-packages": true,

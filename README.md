@@ -220,8 +220,17 @@ repository root:
 
 ```bash
 docker compose run --rm -w /app/agents/laravel tools composer install
-docker compose run --rm -w /app/agents/laravel tools composer test   # Pint and Pest
+docker compose run --rm -w /app/agents/laravel tools composer test         # all of the below
+docker compose run --rm -w /app/agents/laravel tools composer lint         # Pint, fixes the style
+docker compose run --rm -w /app/agents/laravel tools composer types:check  # PHPStan with Larastan, level 8
+docker compose run --rm -w /app/agents/laravel tools composer deps         # composer.json requires what the code uses
 ```
+
+Locally that is the newest PHP and Laravel. The workflow `.github/workflows/laravel-agent.yml` runs the Pest
+tests on every PHP and Laravel version the agent supports (PHP 8.1–8.5, Laravel 10–13), each once with the
+lowest and once with the newest versions Composer finds; `bin/release.sh` only publishes after a green run.
+The tests therefore use what Pest 2 to 5 and Testbench 8 to 11 all have (`uses()`, not `pest()->extend()`),
+and a test for something a Laravel 10 release only got later is skipped where it is missing.
 
 ## Changes
 
