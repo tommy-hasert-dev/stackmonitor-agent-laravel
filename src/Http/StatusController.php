@@ -5,6 +5,7 @@ namespace StackMonitor\Agent\Http;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use StackMonitor\Agent\PhpCode;
+use StackMonitor\Agent\Reach;
 use StackMonitor\Agent\ReportBuilder;
 use StackMonitor\Agent\SuspiciousFiles;
 use StackMonitor\Agent\TestMail;
@@ -18,10 +19,17 @@ final class StatusController
      * (#159), if the app allows it (STACKMONITOR_AGENT_FILE_CONTENTS). Both
      * are asked for by a SHA-256, the path's or the package's id. With
      * X-Monitor-Mail a test mail through the app's mailer (#133) and whether
-     * it went out.
+     * it went out. With X-Monitor-Reach the answers about the entry points
+     * it names (#160).
      */
-    public function __invoke(Request $request, ReportBuilder $builder, SuspiciousFiles $files, PhpCode $code, TestMail $mail): JsonResponse
+    public function __invoke(Request $request, ReportBuilder $builder, SuspiciousFiles $files, PhpCode $code, TestMail $mail, Reach $reach): JsonResponse
     {
+        $points = (string) $request->header('X-Monitor-Reach', '');
+
+        if ($points !== '') {
+            return new JsonResponse($reach->answer(Reach::decode($points)), 200, [], JSON_UNESCAPED_SLASHES);
+        }
+
         $token = (string) $request->header('X-Monitor-Mail', '');
 
         if ($token !== '') {

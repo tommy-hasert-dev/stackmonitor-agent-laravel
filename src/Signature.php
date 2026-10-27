@@ -27,6 +27,15 @@ final class Signature
         return hash_hmac('sha256', $timestamp.'.'.$nonce.'.mail.'.$token.'.'.$to, $secret);
     }
 
+    /**
+     * A request about entry points (#160): the encoded list is signed
+     * along, so nobody on the way can change what is asked.
+     */
+    public static function forReachRequest(string $timestamp, string $nonce, string $points, string $secret): string
+    {
+        return hash_hmac('sha256', $timestamp.'.'.$nonce.'.reach.'.$points, $secret);
+    }
+
     public static function forResponse(string $body, string $nonce, string $secret): string
     {
         return hash_hmac('sha256', $body.'.'.$nonce, $secret);

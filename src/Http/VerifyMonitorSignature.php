@@ -18,6 +18,9 @@ final class VerifyMonitorSignature
     /** The most secrets the agent takes, STACKMONITOR_AGENT_SECRET first; more are ignored. */
     private const MAX_SECRETS = 5;
 
+    /** The longest list of entry points taken, base64url (#160). */
+    private const MAX_REACH_LENGTH = 6000;
+
     /**
      * @param  Closure(Request): Response  $next
      */
@@ -41,12 +44,15 @@ final class VerifyMonitorSignature
         // A request for a test mail (#133) signs its token and recipient along.
         $mail = (string) $request->header('X-Monitor-Mail', '');
         $to = (string) $request->header('X-Monitor-Mail-To', '');
+        // A request about entry points (#160) signs their encoded list along.
+        $reach = (string) $request->header('X-Monitor-Reach', '');
 
         $valid = ctype_digit($timestamp)
             && abs(time() - (int) $timestamp) <= $maxSkew
             && preg_match('/^[a-f0-9]{32}$/', $nonce) === 1
             && ($file === '' || preg_match('/^[a-f0-9]{64}$/', $file) === 1)
-            && (($mail === '' && $to === '') || ($file === '' && TestMail::valid($mail, $to)));
+            && (($mail === '' && $to === '') || ($file === '' && TestMail::valid($mail, $to)))
+            && ($reach === '' || ($file === '' && $mail === '' && strlen($reach) <= self::MAX_REACH_LENGTH && preg_match('/^[A-Za-z0-9_-]+$/', $reach) === 1));
 
         // Each StackMonitor instance signs with its own secret (#223); the one that matches
         // signs the answer too, so no instance learns anything about the others.
@@ -54,6 +60,7 @@ final class VerifyMonitorSignature
 
         foreach ($valid ? self::secrets() : [] as $candidate) {
             $expected = match (true) {
+                $reach !== '' => Signature::forReachRequest($timestamp, $nonce, $reach, $candidate),
                 $mail !== '' => Signature::forMailRequest($timestamp, $nonce, $mail, $to, $candidate),
                 $file !== '' => Signature::forFileRequest($timestamp, $nonce, $file, $candidate),
                 default => Signature::forRequest($timestamp, $nonce, $candidate),

@@ -5,6 +5,19 @@ All notable changes to `stackmonitor/agent-laravel`. The format follows
 [Semantic Versioning](https://semver.org/). Every release needs its section
 here, with the same version as `ReportBuilder::AGENT_VERSION`.
 
+## [1.22.0] - 2026-10-25
+
+### Added
+
+- Answers StackMonitor's questions about the parts of a package a known
+  vulnerability sits in: whether a route is registered and open without
+  a login (behind `auth`, `can`, `signed` or a password confirmation it
+  isn't; a route name also behind a group's prefix), and whether a config
+  value is on. StackMonitor asks only about packages with an open
+  vulnerability; config values go out as on or off, or whether they equal
+  a value StackMonitor names, never their value. Needs StackMonitor from
+  #160 on.
+
 ## [1.21.2] - 2026-10-25
 
 ### Changed
